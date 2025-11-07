@@ -102,16 +102,7 @@ async def create_bug(
                     if not file.filename:
                         raise HTTPException(status_code=400, detail="File must have a filename")
                     
-                    # Validate file using Cloudinary service validation
-                    is_valid, error_message = services.image_storage.validate_file(
-                        filename=file.filename,
-                        file_size=None  # No local file size calculation; let upload_image handle it
-                    )
-                    
-                    if not is_valid:
-                        raise HTTPException(status_code=400, detail=error_message)
-                    
-                    # Upload to Cloudinary
+                    # Upload to Cloudinary (validation handled internally)
                     upload_result = await services.image_storage.upload_image(
                         file=file.file,
                         filename=file.filename,
