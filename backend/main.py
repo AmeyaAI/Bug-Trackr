@@ -1,11 +1,13 @@
 """FastAPI application entry point."""
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
 from .services import ServiceContainer, create_service_container
 from .config import Config
+from .routes import bugs
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +74,18 @@ def create_app(config: Config) -> FastAPI:
         lifespan=lifespan
     )
     
+    # Configure CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000", "http://localhost:3001"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+    
+    # Register routers
+    app.include_router(bugs.router)
+    
     @app.get("/")
     async def root():
         """Root endpoint."""
@@ -89,3 +103,8 @@ def create_app(config: Config) -> FastAPI:
         }
     
     return app
+
+
+# Create app instance for uvicorn
+config = Config.from_env()
+app = create_app(config)
