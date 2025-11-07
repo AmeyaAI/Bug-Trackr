@@ -187,12 +187,14 @@ class AppFlyteCollectionDB(CollectionDBService):
         logger.info(f"Creating item in collection '{collection_name}'")
         result = await self._make_request("POST", url, request_body)
         
+        if result is None:
+            raise ValueError(f"Failed to create item: collection '{collection_name}' not found")
+        
         if result:
             item_id = result.get("__auto_id__", "unknown")
             logger.info(f"Created item in collection '{collection_name}'")
         
         return result
-
     async def get_all_items(
         self,
         collection_name: str
@@ -282,8 +284,6 @@ class AppFlyteCollectionDB(CollectionDBService):
         else:
             logger.warning(f"Item not found in collection '{collection_name}'")
         
-        return result
-
     async def update_item(
         self,
         collection_name: str,
@@ -338,9 +338,13 @@ class AppFlyteCollectionDB(CollectionDBService):
         logger.info(f"Updating item in collection '{collection_name}' with {len(fields)} field(s)")
         result = await self._make_request("PUT", url, request_body)
         
+        if result is None:
+            raise ValueError(f"Failed to update item: item '{item_id}' not found in collection '{collection_name}'")
+        
         if result:
             logger.info(f"Updated item in collection '{collection_name}'")
         
+        return result        
         return result
 
     async def delete_item(

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 from datetime import datetime, timezone
 import logging
+import httpx
 
 from ..models.bug_model import (
     Comment,
@@ -50,11 +51,18 @@ async def create_comment(
             )
         
         # Validate author exists in AppFlyte
-        author = await services.project_api.get_user(comment_request.authorId)
-        if not author:
+        try:
+            author = await services.project_api.get_user(comment_request.authorId)
+            if not author:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"User with ID {comment_request.authorId} not found"
+                )
+        except httpx.TimeoutException:
+            logger.error(f"Timeout validating user {comment_request.authorId}")
             raise HTTPException(
-                status_code=404,
-                detail=f"User with ID {comment_request.authorId} not found"
+                status_code=504,
+                detail="User validation service unavailable"
             )
         
         # Create comment entity
