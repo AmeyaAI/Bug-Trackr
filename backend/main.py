@@ -103,3 +103,8 @@ def create_app(config: Config) -> FastAPI:
         }
     
     return app
+
+
+# Create app instance for uvicorn
+config = Config.from_env()
+app = create_app(config)
