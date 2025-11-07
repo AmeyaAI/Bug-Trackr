@@ -13,6 +13,11 @@ class ProjectAPIClient(ABC):
     """Abstract interface for project and user API operations."""
 
     @abstractmethod
+    async def close(self) -> None:
+        """Close client and cleanup resources."""
+        pass
+
+    @abstractmethod
     async def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve user by ID."""
         pass
@@ -57,11 +62,18 @@ class AppFlyteClient(ProjectAPIClient):
             timeout: Request timeout in seconds
         """
         self._base_url = base_url.rstrip('/')
-        self._timeout = timeout
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
+        self._client = httpx.AsyncClient(
+            timeout=timeout,
+            headers=self._headers
+        )
+
+    async def close(self) -> None:
+        """Close the HTTP client and cleanup resources."""
+        await self._client.aclose()
 
     async def _make_request(
         self,
@@ -87,16 +99,14 @@ class AppFlyteClient(ProjectAPIClient):
         url = f"{self._base_url}/{endpoint.lstrip('/')}"
         
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    headers=self._headers,
-                    json=data,
-                    params=params
-                )
-                response.raise_for_status()
-                return response.json()
+            response = await self._client.request(
+                method=method,
+                url=url,
+                json=data,
+                params=params
+            )
+            response.raise_for_status()
+            return response.json()
         except httpx.HTTPError as e:
             logger.error(f"AppFlyte API request failed: {method} {url} - {e}")
             raise

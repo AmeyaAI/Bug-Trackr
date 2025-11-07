@@ -57,7 +57,7 @@ class CloudinaryService(ImageStorageService):
         cloud_name: str,
         api_key: str,
         api_secret: str,
-        max_file_size: int = 10 * 1024 * 1024
+        max_file_size: Optional[int] = None
     ):
         """Initialize Cloudinary service.
         
@@ -65,10 +65,10 @@ class CloudinaryService(ImageStorageService):
             cloud_name: Cloudinary cloud name
             api_key: Cloudinary API key
             api_secret: Cloudinary API secret
-            max_file_size: Maximum file size in bytes
+            max_file_size: Maximum file size in bytes (defaults to MAX_FILE_SIZE)
         """
         self._cloud_name = cloud_name
-        self._max_file_size = max_file_size
+        self._max_file_size = max_file_size if max_file_size is not None else self.MAX_FILE_SIZE
         self._configure(cloud_name, api_key, api_secret)
 
     def _configure(self, cloud_name: str, api_key: str, api_secret: str) -> None:
@@ -126,9 +126,29 @@ class CloudinaryService(ImageStorageService):
             Dictionary containing upload result with 'url' and 'public_id'
             
         Raises:
-            ValueError: If file validation fails
+            ValueError: If file validation fails or file is not seekable/readable
             Exception: If upload fails
         """
+        # Validate file object
+        if not hasattr(file, 'read') or not callable(file.read):
+            raise ValueError("File object must be readable")
+        
+        if not hasattr(file, 'seek') or not callable(file.seek):
+            raise ValueError("File object must be seekable")
+        
+        # Get file size
+        try:
+            file.seek(0, 2)  # Seek to end
+            file_size = file.tell()
+            file.seek(0)  # Reset to beginning
+        except (OSError, IOError) as e:
+            raise ValueError(f"Failed to read file: {e}")
+        
+        # Validate file before upload
+        is_valid, error_message = self.validate_file(filename, file_size)
+        if not is_valid:
+            raise ValueError(error_message)
+        
         try:
             # Upload to Cloudinary
             result = cloudinary.uploader.upload(
@@ -225,7 +245,7 @@ def create_cloudinary_service(
     cloud_name: str,
     api_key: str,
     api_secret: str,
-    max_file_size: int = 10 * 1024 * 1024
+    max_file_size: Optional[int] = None
 ) -> CloudinaryService:
     """Factory function to create Cloudinary service instance.
     
@@ -233,7 +253,7 @@ def create_cloudinary_service(
         cloud_name: Cloudinary cloud name
         api_key: Cloudinary API key
         api_secret: Cloudinary API secret
-        max_file_size: Maximum file size in bytes
+        max_file_size: Maximum file size in bytes (defaults to CloudinaryService.MAX_FILE_SIZE)
         
     Returns:
         CloudinaryService instance

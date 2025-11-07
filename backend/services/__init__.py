@@ -47,10 +47,10 @@ class ServiceContainer:
     project_api: ProjectAPIClient
     image_storage: ImageStorageService
     
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close all service connections."""
         self.database.disconnect()
-        self.project_api.close()
+        await self.project_api.close()
 
 
 def create_service_container(
@@ -63,6 +63,9 @@ def create_service_container(
     cloudinary_api_secret: str
 ) -> ServiceContainer:
     """Create and initialize service container with all dependencies.
+    
+    This function performs synchronous initialization and should be called
+    during application startup (e.g., in FastAPI lifespan context).
     
     Args:
         mongodb_uri: MongoDB connection string

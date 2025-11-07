@@ -67,6 +67,7 @@ class MongoDBService(DatabaseService):
         self._db: Optional[Database] = None
         self._max_retries = max_retries
         self._retry_delay = retry_delay
+        self._collections_initialized = False
 
     def connect(self) -> None:
         """Establish connection to MongoDB with retry logic.
@@ -76,17 +77,16 @@ class MongoDBService(DatabaseService):
         """
         for attempt in range(self._max_retries):
             try:
-                self._client = MongoClient(
-                    self._uri,
-                    serverSelectionTimeoutMS=5000,
-                    maxPoolSize=50,
-                    minPoolSize=10,
-                    retryWrites=True
-                )
+                self._client = MongoClient(self._uri)
                 # Verify connection
                 self._client.admin.command('ping')
                 self._db = self._client[self._database_name]
-                self._initialize_collections()
+                
+                # Only initialize collections once
+                if not self._collections_initialized:
+                    self._initialize_collections()
+                    self._collections_initialized = True
+                
                 logger.info(f"Successfully connected to MongoDB database: {self._database_name}")
                 return
             except (ConnectionFailure, ServerSelectionTimeoutError) as e:
@@ -95,26 +95,32 @@ class MongoDBService(DatabaseService):
                     time.sleep(self._retry_delay)
                 else:
                     logger.error("Failed to connect to MongoDB after all retries")
-                    raise ConnectionFailure(f"Could not connect to MongoDB: {e}")
+                    raise ConnectionFailure(f"Could not connect to MongoDB after {self._max_retries} attempts") from e
 
     def _initialize_collections(self) -> None:
-        """Initialize database collections with indexes."""
+        """Initialize database collections with indexes.
+        
+        Note: create_index is idempotent and will not recreate existing indexes.
+        """
         if self._db is None:
             raise RuntimeError("Database not connected")
 
-        # Create bugs collection with indexes
-        bugs_collection = self._db["bugs"]
-        bugs_collection.create_index("projectId")
-        bugs_collection.create_index("status")
-        bugs_collection.create_index("assignedTo")
-        bugs_collection.create_index("createdAt")
+        try:
+            # Create bugs collection with indexes
+            bugs_collection = self._db["bugs"]
+            bugs_collection.create_index("projectId")
+            bugs_collection.create_index("status")
+            bugs_collection.create_index("assignedTo")
+            bugs_collection.create_index("createdAt")
 
-        # Create comments collection with indexes
-        comments_collection = self._db["comments"]
-        comments_collection.create_index("bugId")
-        comments_collection.create_index("createdAt")
+            # Create comments collection with indexes
+            comments_collection = self._db["comments"]
+            comments_collection.create_index("bugId")
+            comments_collection.create_index("createdAt")
 
-        logger.info("Database collections initialized with indexes")
+            logger.info("Database collections initialized with indexes")
+        except Exception as e:
+            logger.warning(f"Index creation encountered an issue (may already exist): {e}")
 
     def disconnect(self) -> None:
         """Close MongoDB connection."""
@@ -123,6 +129,7 @@ class MongoDBService(DatabaseService):
             logger.info("MongoDB connection closed")
         self._client = None
         self._db = None
+        # Note: Keep _collections_initialized as True since indexes persist in database
     @property
     def bugs(self) -> Collection:
         """Get bugs collection.

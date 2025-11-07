@@ -51,7 +51,7 @@ def create_app(config: Config) -> FastAPI:
             logger.error(f"Failed to initialize services: {e}")
             if services is not None:
                 try:
-                    services.close()
+                    await services.close()
                 except Exception as cleanup_error:
                     logger.error(f"Error during cleanup of services: {cleanup_error}")
             raise
@@ -61,7 +61,7 @@ def create_app(config: Config) -> FastAPI:
         # Shutdown
         logger.info("Shutting down BugTrackr application...")
         if services:
-            services.close()
+            await services.close()
         logger.info("All services closed")
     
     # Create FastAPI application
