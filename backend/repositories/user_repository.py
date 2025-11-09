@@ -107,7 +107,7 @@ class UserRepository:
         Returns:
             List of User models
         """
-        import json
+        
         
         logger.info("Retrieving all users")
         

@@ -1,7 +1,7 @@
 """Repository for Project entity data access."""
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 import json
 
@@ -63,7 +63,7 @@ class ProjectRepository:
         Raises:
             ValueError: If description field is malformed or required fields are missing
         """
-        import json
+
         from datetime import timezone
         
         # Handle __auto_id__ from AppFlyte
@@ -178,7 +178,7 @@ class ProjectRepository:
         Returns:
             List of Project models
         """
-        import json
+        
         
         logger.info("Retrieving all projects")
         
