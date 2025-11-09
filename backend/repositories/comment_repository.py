@@ -1,7 +1,7 @@
 """Repository for Comment entity data access."""
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 
 from backend.models.bug_model import Comment
@@ -136,18 +136,12 @@ class CommentRepository:
         """
         logger.info(f"Retrieving comments for bug: {bug_id}")
         
-        # Fetch all items from collection
-        items = await self._service.get_all_items(self._collection)
+        # Fetch items filtered by type and bugId from collection
+        filter_dict = {"type": self._entity_type, "bugId": bug_id}
+        items = await self._service.get_items_by_filter(self._collection, filter_dict)
         
-        # Filter by type and transform to Comment models
-        comments = [
-            self._collection_item_to_comment(item) 
-            for item in items 
-            if item.get("type") == self._entity_type
-        ]
-        
-        # Filter by bug ID
-        comments = [comment for comment in comments if comment.bugId == bug_id]
+        # Transform to Comment models
+        comments = [self._collection_item_to_comment(item) for item in items]
         
         # Sort by createdAt
         comments.sort(key=lambda c: c.createdAt)

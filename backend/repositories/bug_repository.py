@@ -1,7 +1,7 @@
 """Repository for Bug entity data access."""
 
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 
 from backend.models.bug_model import Bug, BugStatus, BugPriority, BugSeverity
@@ -160,26 +160,20 @@ class BugRepository:
         """
         logger.info(f"Retrieving all bugs (filters: projectId={project_id}, status={status}, assignedTo={assigned_to})")
         
-        # Fetch all items from collection
-        items = await self._service.get_all_items(self._collection)
-        
-        # Filter by type and transform to Bug models
-        bugs = [
-            self._collection_item_to_bug(item) 
-            for item in items 
-            if item.get("type") == self._entity_type
-        ]
-        
-        # Apply in-memory filters
+        # Build server-side filters
+        filters = {"type": self._entity_type}
         if project_id is not None:
-            bugs = [bug for bug in bugs if bug.projectId == project_id]
-        
+            filters["projectId"] = project_id
         if status is not None:
-            bugs = [bug for bug in bugs if bug.status == status]
-        
+            filters["status"] = status.value
         if assigned_to is not None:
-            bugs = [bug for bug in bugs if bug.assignedTo == assigned_to]
-        
+            filters["assignedTo"] = assigned_to
+
+        # Fetch filtered items from collection
+        items = await self._service.get_all_items(self._collection, filters=filters)
+
+        # Transform to Bug models
+        bugs = [self._collection_item_to_bug(item) for item in items]
         logger.info(f"Retrieved {len(bugs)} bugs after filtering")
         return bugs
 

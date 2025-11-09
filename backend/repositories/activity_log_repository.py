@@ -1,7 +1,7 @@
 """Repository for ActivityLog entity data access."""
 
 from typing import List, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 
 from backend.models.bug_model import ActivityLog
@@ -112,18 +112,12 @@ class ActivityLogRepository:
         """
         logger.info(f"Retrieving activity logs for bug: {bug_id}")
         
-        # Fetch all items from collection
-        items = await self._service.get_all_items(self._collection)
+        # Fetch only activity logs for the given bug ID from collection
+        filter_dict = {"type": self._entity_type, "bugId": bug_id}
+        items = await self._service.get_items_by_filter(self._collection, filter_dict)
         
-        # Filter by type and transform to ActivityLog models
-        logs = [
-            self._collection_item_to_activity_log(item) 
-            for item in items 
-            if item.get("type") == self._entity_type
-        ]
-        
-        # Filter by bug ID
-        logs = [log for log in logs if log.bugId == bug_id]
+        # Transform to ActivityLog models
+        logs = [self._collection_item_to_activity_log(item) for item in items]
         
         # Sort by timestamp (newest first)
         logs.sort(key=lambda l: l.timestamp, reverse=True)
