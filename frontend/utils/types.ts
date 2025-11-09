@@ -67,7 +67,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: string;
   createdAt: string;
 }
 
@@ -92,7 +92,7 @@ export interface BugCreateRequest {
 export interface BugStatusUpdateRequest {
   status: BugStatus;
   userId: string;
-  userRole: string;
+  userRole: UserRole;
 }
 
 export interface BugAssignRequest {
@@ -114,9 +114,9 @@ export interface BugResponse {
   projectId: string;
   reportedBy: string;
   assignedTo?: string;
-  status: string;
-  priority: string;
-  severity: string;
+  status: BugStatus;
+  priority: BugPriority;
+  severity: BugSeverity;
   tags: string[];
   validated: boolean;
   createdAt: string;

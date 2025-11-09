@@ -108,14 +108,12 @@ export const handleApiError = (error: AxiosError): string => {
 const transformDates = <T extends Record<string, any>>(data: T): T => {
   const dateFields = ['createdAt', 'updatedAt', 'timestamp'];
   const transformed = { ...data };
-  
+
   dateFields.forEach(field => {
     if (transformed[field] && typeof transformed[field] === 'string') {
-      // Keep as string for consistency with TypeScript interfaces
-      // Components can parse to Date when needed
+      transformed[field] = new Date(transformed[field]);
     }
   });
-  
   return transformed;
 };
 
