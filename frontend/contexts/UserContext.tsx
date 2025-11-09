@@ -7,8 +7,8 @@
  * Requirements: 3.1, 3.4
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '@/utils/types';
+import React, { createContext, useContext, useState } from 'react';
+import { User } from '@/utils/types';
 
 interface UserContextType {
   currentUser: User | null;
@@ -31,29 +31,34 @@ interface UserProviderProps {
 }
 
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Load user from localStorage on mount
-    const storedUser = localStorage.getItem('bugtrackr_current_user');
-    if (storedUser) {
-      try {
-        setCurrentUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('bugtrackr_current_user');
+  // Lazy initialization: load from localStorage only once on mount
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('bugtrackr_current_user');
+      if (storedUser) {
+        try {
+          return JSON.parse(storedUser);
+        } catch (error) {
+          console.error('Failed to parse stored user:', error);
+          localStorage.removeItem('bugtrackr_current_user');
+        }
       }
     }
-    setIsLoading(false);
-  }, []);
+    return null;
+  });
+
+  const isLoading = false; // No longer needed since we use lazy initialization
 
   const handleSetCurrentUser = (user: User | null) => {
     setCurrentUser(user);
-    if (user) {
-      localStorage.setItem('bugtrackr_current_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('bugtrackr_current_user');
+    
+    // Only access localStorage in browser environment
+    if (typeof window !== 'undefined') {
+      if (user) {
+        localStorage.setItem('bugtrackr_current_user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('bugtrackr_current_user');
+      }
     }
   };
 

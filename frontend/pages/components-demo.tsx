@@ -15,7 +15,6 @@ import { userApi } from '@/utils/apiClient';
 
 const createSampleBugs = (users: User[]): Bug[] => {
   // Use real user IDs from Collection DB if available
-  const userId1 = users[0]?._id || '1';
   const userId2 = users[1]?._id || '2';
   const userId3 = users[2]?._id || '3';
 

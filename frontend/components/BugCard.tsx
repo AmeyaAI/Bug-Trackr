@@ -1,19 +1,27 @@
 /**
  * BugCard Component
- * 
+ *
  * Displays bug summary information with status and priority indicators.
  * Provides quick action buttons for status updates and shows comment counts
  * and assignment information.
- * 
+ *
  * Requirements: 2.1, 2.5
  */
 
-import React from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Bug, BugStatus, BugPriority, BugSeverity } from '@/utils/types';
+import React from "react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Bug, BugStatus, BugPriority } from "@/utils/types";
+import { getInitials } from "@/lib/utils";
 
 interface BugCardProps {
   bug: Bug;
@@ -26,7 +34,9 @@ interface BugCardProps {
 /**
  * Get badge variant based on bug status
  */
-const getStatusVariant = (status: BugStatus): "default" | "secondary" | "destructive" | "outline" => {
+const getStatusVariant = (
+  status: BugStatus
+): "default" | "secondary" | "destructive" | "outline" => {
   switch (status) {
     case BugStatus.OPEN:
       return "destructive";
@@ -44,7 +54,9 @@ const getStatusVariant = (status: BugStatus): "default" | "secondary" | "destruc
 /**
  * Get badge variant based on priority
  */
-const getPriorityVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
+const getPriorityVariant = (
+  priority: BugPriority
+): "default" | "secondary" | "destructive" | "outline" => {
   switch (priority) {
     case BugPriority.CRITICAL:
       return "destructive";
@@ -59,17 +71,7 @@ const getPriorityVariant = (priority: BugPriority): "default" | "secondary" | "d
   }
 };
 
-/**
- * Get initials from name for avatar fallback
- */
-const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-};
+
 
 export const BugCard: React.FC<BugCardProps> = ({
   bug,
@@ -101,9 +103,7 @@ export const BugCard: React.FC<BugCardProps> = ({
             </CardDescription>
           </div>
           <div className="flex flex-col gap-2 items-end">
-            <Badge variant={getStatusVariant(bug.status)}>
-              {bug.status}
-            </Badge>
+            <Badge variant={getStatusVariant(bug.status)}>{bug.status}</Badge>
             <Badge variant={getPriorityVariant(bug.priority)}>
               {bug.priority}
             </Badge>
@@ -150,11 +150,11 @@ export const BugCard: React.FC<BugCardProps> = ({
           <div className="flex items-center gap-2 mt-4">
             <Avatar className="size-6">
               <AvatarFallback className="text-xs">
-                {assignedUserName ? getInitials(assignedUserName) : 'U'}
+                {assignedUserName ? getInitials(assignedUserName) : "U"}
               </AvatarFallback>
             </Avatar>
             <span className="text-sm text-muted-foreground">
-              Assigned to {assignedUserName || 'User'}
+              Assigned to {assignedUserName || "User"}
             </span>
           </div>
         )}
@@ -171,7 +171,7 @@ export const BugCard: React.FC<BugCardProps> = ({
             Start Progress
           </Button>
         )}
-        
+
         {bug.status === BugStatus.IN_PROGRESS && (
           <Button
             size="sm"

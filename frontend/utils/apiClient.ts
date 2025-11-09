@@ -57,7 +57,7 @@ apiClient.interceptors.response.use(
     }
     return response;
   },
-  (error: AxiosError) => {
+  (error: AxiosError<ApiErrorResponse>) => {
     // Handle errors
     const errorMessage = handleApiError(error);
     console.error('[API Response Error]', errorMessage);
@@ -66,33 +66,52 @@ apiClient.interceptors.response.use(
 );
 
 /**
+ * API Error Response structure
+ */
+interface ApiErrorResponse {
+  detail?: string | ValidationError[];
+}
+
+interface ValidationError {
+  msg: string;
+  loc: string[];
+  type: string;
+}
+
+/**
  * Handle API errors and return user-friendly messages
  */
-export const handleApiError = (error: AxiosError): string => {
+export const handleApiError = (error: AxiosError<ApiErrorResponse>): string => {
   if (error.response) {
     // Server responded with error status
     const status = error.response.status;
-    const data = error.response.data as any;
+    const data = error.response.data;
     
     switch (status) {
       case 400:
-        return data?.detail || 'Invalid request. Please check your input.';
+        return data?.detail && typeof data.detail === 'string' 
+          ? data.detail 
+          : 'Invalid request. Please check your input.';
       case 401:
         return 'Unauthorized. Please log in again.';
       case 403:
         return 'You do not have permission to perform this action.';
       case 404:
-        return data?.detail || 'Resource not found.';
+        return data?.detail && typeof data.detail === 'string'
+          ? data.detail 
+          : 'Resource not found.';
       case 422:
         // Validation error
         if (data?.detail && Array.isArray(data.detail)) {
-          return data.detail.map((err: any) => err.msg).join(', ');
+          return data.detail.map((err) => err.msg).join(', ');
         }
         return 'Validation error. Please check your input.';
       case 500:
         return 'Server error. Please try again later.';
       default:
-        return data?.detail || `Error: ${status}`;
+        return data?.detail && typeof data.detail === 'string'
+          ? data.detail 
+          : `Error: ${status}`;
     }
   } else if (error.request) {
     // Request made but no response
@@ -106,8 +125,10 @@ export const handleApiError = (error: AxiosError): string => {
 /**
  * Transform backend date strings to Date objects
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const transformDates = <T extends Record<string, any>>(data: T): T => {
   const dateFields = ['createdAt', 'updatedAt', 'timestamp'];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformed = { ...data } as Record<string, any>;
 
   dateFields.forEach(field => {

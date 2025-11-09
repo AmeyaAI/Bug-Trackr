@@ -7,7 +7,7 @@
  * Requirements: 3.1, 3.4
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   Select,
   SelectContent,
@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUser } from '@/contexts/UserContext';
 import { User } from '@/utils/types';
+import { getInitials } from '@/lib/utils';
 
 interface UserSelectorProps {
   users: User[];
@@ -26,17 +27,7 @@ interface UserSelectorProps {
   className?: string;
 }
 
-/**
- * Get initials from name for avatar fallback
- */
-const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-};
+
 
 /**
  * Get badge variant based on user role
@@ -67,17 +58,12 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
   className,
 }) => {
   const { currentUser, setCurrentUser } = useUser();
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
 
-  useEffect(() => {
-    if (currentUser) {
-      setSelectedUserId(currentUser._id);
-    }
-  }, [currentUser]);
+  // Derive selectedUserId from currentUser instead of syncing state
+  const selectedUserId = currentUser?._id || '';
 
   const handleValueChange = (userId: string) => {
     const user = users.find(u => u._id === userId) || null;
-    setSelectedUserId(userId);
     setCurrentUser(user);
     
     if (onUserChange) {

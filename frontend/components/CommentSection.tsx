@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Comment } from '@/utils/types';
+import { getInitials } from '@/lib/utils';
 
 interface CommentSectionProps {
   bugId: string;
@@ -24,17 +25,7 @@ interface CommentSectionProps {
   getUserName?: (userId: string) => string;
 }
 
-/**
- * Get initials from name for avatar fallback
- */
-const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-};
+
 
 /**
  * Format date to relative time
