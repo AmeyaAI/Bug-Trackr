@@ -24,7 +24,7 @@ class ActivityLogRepository:
             collection_service: CollectionDBService instance for data operations
         """
         self._service = collection_service
-        self._collection = ""  # Use base collection (ameya_tests)
+        self._collection = "ameya_tests"  # Collection name (service converts to singular for item ops)
         self._entity_type = "activity_log"
 
     def _activity_log_to_collection_item(self, activity_log: ActivityLog) -> Dict[str, Any]:

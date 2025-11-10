@@ -262,6 +262,27 @@ class AppFlyteCollectionDB(CollectionDBService):
         logger.warning(f"Unexpected response format from collection '{collection_name or 'base'}': {type(result)}")
         return []
 
+    def _get_singular_collection_name(self, collection_name: str) -> str:
+        """Convert plural collection name to singular for item operations.
+        
+        AppFlyte API uses plural for list operations (ameya_tests) but
+        singular for item operations (ameya_test).
+        
+        Args:
+            collection_name: Collection name (may be plural or empty)
+            
+        Returns:
+            Singular form of collection name
+        """
+        if not collection_name:
+            return collection_name
+        
+        # Simple pluralization rule: remove trailing 's'
+        if collection_name.endswith('s'):
+            return collection_name[:-1]
+        
+        return collection_name
+
     async def get_item_by_id(
         self,
         collection_name: str,
@@ -269,10 +290,12 @@ class AppFlyteCollectionDB(CollectionDBService):
     ) -> Optional[Dict[str, Any]]:
         """Get single item by ID.
         
-        GET {base_url}/{collection_name}/{item_id}
+        GET {base_url}/{collection_name_singular}/{item_id}
+        
+        Note: API uses singular form for item operations (e.g., ameya_test)
         
         Args:
-            collection_name: Name of the collection
+            collection_name: Name of the collection (plural form)
                            Empty string uses base collection
             item_id: Item ID (__auto_id__)
             
@@ -286,16 +309,26 @@ class AppFlyteCollectionDB(CollectionDBService):
         if not item_id or not item_id.strip():
             raise ValueError("item_id cannot be empty")
         
-        # Build URL - empty collection_name uses base URL
-        url = f"{self._base_url}/{collection_name}/{item_id}" if collection_name else f"{self._base_url}/{item_id}"
+        # Convert to singular form for item operations
+        singular_name = self._get_singular_collection_name(collection_name)
         
-        logger.info(f"Retrieving item from collection '{collection_name or 'base'}'")
+        # Build URL - empty collection_name uses base URL
+        url = f"{self._base_url}/{singular_name}/{item_id}" if singular_name else f"{self._base_url}/{item_id}"
+        
+        logger.info(f"Retrieving item from collection '{singular_name or 'base'}'")
         result = await self._make_request("GET", url)
         
         if result:
-            logger.info(f"Retrieved item from collection '{collection_name or 'base'}'")
+            logger.info(f"Retrieved item from collection '{singular_name or 'base'}'")
+            logger.debug(f"Raw response keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
+            logger.debug(f"Raw response: {result}")
+            
+            # Check if response is wrapped in a payload structure
+            if isinstance(result, dict) and "payload" in result:
+                logger.debug("Extracting payload from response")
+                return result["payload"]
         else:
-            logger.warning(f"Item not found in collection '{collection_name or 'base'}'")
+            logger.warning(f"Item not found in collection '{singular_name or 'base'}'")
         
         return result
         
@@ -307,7 +340,7 @@ class AppFlyteCollectionDB(CollectionDBService):
     ) -> Dict[str, Any]:
         """Update item fields.
         
-        PUT {base_url}/{collection_name}/{item_id}
+        PUT {base_url}/{collection_name_singular}/{item_id}
         Body: {
             "id": item_id,
             "fields": [
@@ -315,8 +348,10 @@ class AppFlyteCollectionDB(CollectionDBService):
             ]
         }
         
+        Note: API uses singular form for item operations (e.g., ameya_test)
+        
         Args:
-            collection_name: Name of the collection
+            collection_name: Name of the collection (plural form)
                            Empty string uses base collection
             item_id: Item ID (__auto_id__)
             updates: Dictionary of field names to new values
@@ -334,8 +369,11 @@ class AppFlyteCollectionDB(CollectionDBService):
         if updates is None or not updates:
             raise ValueError("updates cannot be None or empty")
         
+        # Convert to singular form for item operations
+        singular_name = self._get_singular_collection_name(collection_name)
+        
         # Build URL - empty collection_name uses base URL
-        url = f"{self._base_url}/{collection_name}/{item_id}" if collection_name else f"{self._base_url}/{item_id}"
+        url = f"{self._base_url}/{singular_name}/{item_id}" if singular_name else f"{self._base_url}/{item_id}"
         
         # Convert updates dict to fields array with JSON path syntax
         fields: List[Dict[str, Any]] = []
@@ -350,13 +388,13 @@ class AppFlyteCollectionDB(CollectionDBService):
             "fields": fields
         }
         
-        logger.info(f"Updating item in collection '{collection_name or 'base'}' with {len(fields)} field(s)")
+        logger.info(f"Updating item in collection '{singular_name or 'base'}' with {len(fields)} field(s)")
         result = await self._make_request("PUT", url, request_body)
         
         if result is None:
-            raise ValueError(f"Failed to update item: item '{item_id}' not found in collection '{collection_name or 'base'}'")
+            raise ValueError(f"Failed to update item: item '{item_id}' not found in collection '{singular_name or 'base'}'")
         
-        logger.info(f"Updated item in collection '{collection_name or 'base'}'")
+        logger.info(f"Updated item in collection '{singular_name or 'base'}'")
         
         return result
 
@@ -367,10 +405,12 @@ class AppFlyteCollectionDB(CollectionDBService):
     ) -> bool:
         """Delete item by ID.
         
-        DELETE {base_url}/{collection_name}/{item_id}
+        DELETE {base_url}/{collection_name_singular}/{item_id}
+        
+        Note: API uses singular form for item operations (e.g., ameya_test)
         
         Args:
-            collection_name: Name of the collection
+            collection_name: Name of the collection (plural form)
                            Empty string uses base collection
             item_id: Item ID (__auto_id__)
             
@@ -385,19 +425,22 @@ class AppFlyteCollectionDB(CollectionDBService):
         if not item_id or not item_id.strip():
             raise ValueError("item_id cannot be empty")
         
-        # Build URL - empty collection_name uses base URL
-        url = f"{self._base_url}/{collection_name}/{item_id}" if collection_name else f"{self._base_url}/{item_id}"
+        # Convert to singular form for item operations
+        singular_name = self._get_singular_collection_name(collection_name)
         
-        logger.info(f"Deleting item from collection '{collection_name or 'base'}'")
+        # Build URL - empty collection_name uses base URL
+        url = f"{self._base_url}/{singular_name}/{item_id}" if singular_name else f"{self._base_url}/{item_id}"
+        
+        logger.info(f"Deleting item from collection '{singular_name or 'base'}'")
         result = await self._make_request("DELETE", url)
         
         # DELETE returns None for 404, {} for success, or error
         success = result is not None
         
         if success:
-            logger.info(f"Deleted item from collection '{collection_name or 'base'}'")
+            logger.info(f"Deleted item from collection '{singular_name or 'base'}'")
         else:
-            logger.warning(f"Failed to delete item from collection '{collection_name or 'base'}'")
+            logger.warning(f"Failed to delete item from collection '{singular_name or 'base'}'")
         
         return success
 

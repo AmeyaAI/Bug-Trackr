@@ -25,7 +25,7 @@ class UserRepository:
             collection_service: CollectionDBService instance for data operations
         """
         self._service = collection_service
-        self._collection = ""  # Use base collection (ameya_tests)
+        self._collection = "ameya_tests"  # Collection name (service converts to singular for item ops)
         self._entity_type = "user"
 
     def _collection_item_to_user(self, item: Dict[str, Any]) -> User:

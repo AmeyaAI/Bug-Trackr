@@ -24,7 +24,7 @@ class BugRepository:
             collection_service: CollectionDBService instance for data operations
         """
         self._service = collection_service
-        self._collection = ""  # Use base collection (ameya_tests)
+        self._collection = "ameya_tests"  # Collection name (service converts to singular for item ops)
         self._entity_type = "bug"
 
     def _bug_to_collection_item(self, bug: Bug) -> Dict[str, Any]:
@@ -160,20 +160,28 @@ class BugRepository:
         """
         logger.info(f"Retrieving all bugs (filters: projectId={project_id}, status={status}, assignedTo={assigned_to})")
         
-        # Build server-side filters
-        filters = {"type": self._entity_type}
-        if project_id is not None:
-            filters["projectId"] = project_id
-        if status is not None:
-            filters["status"] = status.value
-        if assigned_to is not None:
-            filters["assignedTo"] = assigned_to
-
-        # Fetch filtered items from collection
-        items = await self._service.get_all_items(self._collection, filters=filters)
+        # Fetch all items from collection (filtering not supported by service)
+        items = await self._service.get_all_items(self._collection)
+        
+        # Filter items in-memory
+        filtered_items = []
+        for item in items:
+            # Check type
+            if item.get("type") != self._entity_type:
+                continue
+            
+            # Apply filters
+            if project_id is not None and item.get("projectId") != project_id:
+                continue
+            if status is not None and item.get("status") != status.value:
+                continue
+            if assigned_to is not None and item.get("assignedTo") != assigned_to:
+                continue
+            
+            filtered_items.append(item)
 
         # Transform to Bug models
-        bugs = [self._collection_item_to_bug(item) for item in items]
+        bugs = [self._collection_item_to_bug(item) for item in filtered_items]
         logger.info(f"Retrieved {len(bugs)} bugs after filtering")
         return bugs
 

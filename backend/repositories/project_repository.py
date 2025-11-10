@@ -25,7 +25,7 @@ class ProjectRepository:
             collection_service: CollectionDBService instance for data operations
         """
         self._service = collection_service
-        self._collection = ""  # Use base collection (ameya_tests)
+        self._collection = "ameya_tests"  # Collection name (service converts to singular for item ops)
         self._entity_type = "project"
 
     def _project_to_collection_item(self, project: Project) -> Dict[str, Any]:
@@ -66,11 +66,17 @@ class ProjectRepository:
 
         from datetime import timezone
         
+        # Debug: Log the raw item structure
+        logger.debug(f"Parsing item with keys: {list(item.keys())}")
+        logger.debug(f"Item content: {item}")
+        
         # Handle __auto_id__ from AppFlyte
         project_id = item.get("__auto_id__")
         
         # Parse JSON from description field (workaround for limited schema)
         description_field = item.get("description", "{}")
+        logger.debug(f"Description field type: {type(description_field)}, value: {description_field}")
+        
         try:
             data = json.loads(description_field) if isinstance(description_field, str) else {}
         except json.JSONDecodeError as e:

@@ -24,7 +24,7 @@ class CommentRepository:
             collection_service: CollectionDBService instance for data operations
         """
         self._service = collection_service
-        self._collection = ""  # Use base collection (ameya_tests)
+        self._collection = "ameya_tests"  # Collection name (service converts to singular for item ops)
         self._entity_type = "comment"
 
     def _comment_to_collection_item(self, comment: Comment) -> Dict[str, Any]:
