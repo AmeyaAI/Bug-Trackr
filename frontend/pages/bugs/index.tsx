@@ -19,8 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { bugApi, projectApi, userApi, commentApi } from '@/utils/apiClient';
-import { Bug, BugStatus, BugPriority, Project, User } from '@/utils/types';
+import { bugApi, userApi, commentApi } from '@/utils/apiClient';
+import { Bug, BugStatus, BugPriority, User } from '@/utils/types';
 import { useUser } from '@/contexts/UserContext';
 
 export default function BugsPage() {
@@ -28,7 +28,6 @@ export default function BugsPage() {
   const { currentUser } = useUser();
   
   const [bugs, setBugs] = useState<Bug[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -48,14 +47,12 @@ export default function BugsPage() {
     setError(null);
     
     try {
-      const [bugsData, projectsData, usersData] = await Promise.all([
+      const [bugsData, usersData] = await Promise.all([
         bugApi.getAll(),
-        projectApi.getAll(),
         userApi.getAll(),
       ]);
       
       setBugs(bugsData);
-      setProjects(projectsData);
       setUsers(usersData);
       
       // Load comment counts for each bug
