@@ -105,8 +105,6 @@ export default function BugsPage() {
     router.push('/bugs/new');
   };
 
-  // Get project name by ID
-
 
   // Get user name by ID
   const getUserName = (userId: string): string => {
