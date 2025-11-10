@@ -164,7 +164,16 @@ export const bugApi = {
    * Create new bug
    */
   create: async (data: BugCreateRequest): Promise<BugResponse> => {
-    const response = await apiClient.post<BugResponse>('/api/bugs', data);
+    // Backend expects form data, not JSON
+    const formData = new FormData();
+    formData.append('title', data.title);
+    formData.append('description', data.description);
+    formData.append('projectId', data.projectId);
+    formData.append('reportedBy', data.reportedBy);
+    formData.append('priority', String(data.priority));
+    formData.append('severity', String(data.severity));
+    
+    const response = await apiClient.post<BugResponse>('/api/bugs', formData);
     return transformDates(response.data);
   },
 
