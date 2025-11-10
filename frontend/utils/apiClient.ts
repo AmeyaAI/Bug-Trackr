@@ -170,8 +170,8 @@ export const bugApi = {
     formData.append('description', data.description);
     formData.append('projectId', data.projectId);
     formData.append('reportedBy', data.reportedBy);
-    formData.append('priority', data.priority);
-    formData.append('severity', data.severity);
+    formData.append('priority', String(data.priority));
+    formData.append('severity', String(data.severity));
     
     const response = await apiClient.post<BugResponse>('/api/bugs', formData);
     return transformDates(response.data);
