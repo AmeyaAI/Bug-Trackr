@@ -3,6 +3,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
+import json
 
 from backend.models.bug_model import Comment
 from backend.services.collection_db import CollectionDBService
@@ -30,22 +31,33 @@ class CommentRepository:
     def _comment_to_collection_item(self, comment: Comment) -> Dict[str, Any]:
         """Transform Comment model to collection item format.
         
+        Collection DB only supports name, description, and created_at fields.
+        We store a display identifier in 'name' and all comment data as JSON in 'description'.
+        
         Args:
             comment: Comment model instance
             
         Returns:
             Dictionary in collection item format
         """
-        return {
+        # Store structured data as JSON in description field
+        data = {
             "type": self._entity_type,
             "bugId": comment.bugId,
             "authorId": comment.authorId,
-            "message": comment.message,
-            "createdAt": comment.createdAt.isoformat()
+            "message": comment.message
+        }
+        
+        return {
+            "name": f"Comment by {comment.authorId}",  # Display identifier
+            "description": json.dumps(data),  # All comment data as JSON
+            "created_at": comment.createdAt.isoformat()
         }
 
     def _collection_item_to_comment(self, item: Dict[str, Any]) -> Comment:
         """Transform collection item to Comment model.
+        
+        Parses the JSON-encoded description field to extract comment data.
         
         Args:
             item: Collection item dictionary
@@ -54,33 +66,61 @@ class CommentRepository:
             Comment model instance
             
         Raises:
-            ValueError: If datetime fields have unexpected types or invalid format
+            ValueError: If description field is malformed or required fields are missing
         """
-        # Work with a copy to avoid mutating input
-        item = item.copy()
+        from datetime import timezone
+        
+        # Check if response is wrapped in a payload structure
+        if isinstance(item, dict) and "payload" in item:
+            logger.debug("Extracting payload from item response")
+            item = item["payload"]
         
         # Handle __auto_id__ from AppFlyte
-        if "__auto_id__" in item:
-            item["_id"] = item.pop("__auto_id__")
+        comment_id = item.get("__auto_id__")
         
-        # Parse createdAt with robust type checking
-        created_at = item.get("createdAt")
-        if created_at is None:
-            pass  # Leave as None
-        elif isinstance(created_at, datetime):
-            pass  # Already a datetime, no parsing needed
-        elif isinstance(created_at, str):
-            try:
-                item["createdAt"] = datetime.fromisoformat(created_at)
-            except ValueError as e:
-                raise ValueError(f"Invalid datetime format for createdAt: {created_at}") from e
-        else:
+        # Parse JSON from description field
+        description_field = item.get("description", "{}")
+        
+        try:
+            data = json.loads(description_field) if isinstance(description_field, str) else {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse description as JSON for comment {comment_id}: {e}")
             raise ValueError(
-                f"Invalid type for createdAt: expected str, datetime, or None, "
-                f"got {type(created_at).__name__}"
+                f"Invalid comment data for comment_id '{comment_id}': "
+                f"description field contains malformed JSON - {str(e)}"
             )
         
-        return Comment(**item)
+        # Extract fields from JSON data
+        bug_id = data.get("bugId", "")
+        author_id = data.get("authorId", "")
+        message = data.get("message", "")
+        
+        # Parse created_at with robust type checking
+        created_at = item.get("created_at")
+        if created_at is None:
+            created_at = datetime.now(timezone.utc)
+        elif isinstance(created_at, datetime):
+            pass  # Already a datetime
+        elif isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at)
+            except ValueError:
+                logger.warning(f"Invalid datetime format for comment {comment_id}, using current time")
+                created_at = datetime.now(timezone.utc)
+        else:
+            logger.warning(
+                f"Unexpected type for created_at in comment {comment_id}: {type(created_at).__name__}, "
+                f"using current time"
+            )
+            created_at = datetime.now(timezone.utc)
+        
+        return Comment(
+            _id=comment_id,
+            bugId=bug_id,
+            authorId=author_id,
+            message=message,
+            createdAt=created_at
+        )
     async def create(self, comment: Comment) -> Comment:
         """Create a new comment.
         
@@ -136,12 +176,38 @@ class CommentRepository:
         """
         logger.info(f"Retrieving comments for bug: {bug_id}")
         
-        # Fetch items filtered by type and bugId from collection
-        filter_dict = {"type": self._entity_type, "bugId": bug_id}
-        items = await self._service.get_items_by_filter(self._collection, filter_dict)
+        # Fetch all items from collection
+        items = await self._service.get_all_items(self._collection)
+        
+        # Filter items in-memory (since data is in JSON description field)
+        filtered_items = []
+        for item in items:
+            description = item.get("description", "")
+            
+            # Skip empty descriptions
+            if not description:
+                continue
+            
+            # Parse JSON and check type and bugId
+            try:
+                data = json.loads(description)
+                
+                # Only process items with matching type and bugId
+                if data.get("type") == self._entity_type and data.get("bugId") == bug_id:
+                    try:
+                        filtered_items.append(item)
+                    except ValueError as e:
+                        # Skip malformed comment data but log the error
+                        logger.warning(f"Skipping malformed comment data: {e}")
+                        continue
+                        
+            except json.JSONDecodeError as e:
+                # Log parsing failures
+                logger.warning(f"Failed to parse description as JSON: {e}")
+                continue
         
         # Transform to Comment models
-        comments = [self._collection_item_to_comment(item) for item in items]
+        comments = [self._collection_item_to_comment(item) for item in filtered_items]
         
         # Sort by createdAt
         comments.sort(key=lambda c: c.createdAt)

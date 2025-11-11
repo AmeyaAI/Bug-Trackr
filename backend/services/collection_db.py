@@ -190,6 +190,10 @@ class AppFlyteCollectionDB(CollectionDBService):
         if result is None:
             raise ValueError(f"Failed to create item: collection '{collection_name or 'base'}' not found")
 
+        # Check if response is wrapped in a payload structure
+        if isinstance(result, dict) and "payload" in result:
+            result = result["payload"]
+        
         item_id = result.get("__auto_id__", "unknown")
         logger.info(f"Created item in collection '{collection_name or 'base'}' with id '{item_id}'")
         return result
@@ -320,12 +324,9 @@ class AppFlyteCollectionDB(CollectionDBService):
         
         if result:
             logger.info(f"Retrieved item from collection '{singular_name or 'base'}'")
-            logger.debug(f"Raw response keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
-            logger.debug(f"Raw response: {result}")
             
             # Check if response is wrapped in a payload structure
             if isinstance(result, dict) and "payload" in result:
-                logger.debug("Extracting payload from response")
                 return result["payload"]
         else:
             logger.warning(f"Item not found in collection '{singular_name or 'base'}'")
@@ -393,6 +394,18 @@ class AppFlyteCollectionDB(CollectionDBService):
         
         if result is None:
             raise ValueError(f"Failed to update item: item '{item_id}' not found in collection '{singular_name or 'base'}'")
+        
+        # If result is an empty dict, we need to fetch the updated item
+        if isinstance(result, dict) and not result:
+            logger.warning("Update returned empty response, fetching updated item")
+            result = await self.get_item_by_id(collection_name, item_id)
+            if result is None:
+                raise ValueError(f"Failed to retrieve updated item: item '{item_id}' not found in collection '{singular_name or 'base'}'")
+            return result
+        
+        # Check if response is wrapped in a payload structure
+        if isinstance(result, dict) and "payload" in result:
+            result = result["payload"]
         
         logger.info(f"Updated item in collection '{singular_name or 'base'}'")
         

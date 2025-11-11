@@ -3,6 +3,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
+import json
 
 from backend.models.bug_model import Bug, BugStatus, BugPriority, BugSeverity
 from backend.services.collection_db import CollectionDBService
@@ -30,15 +31,18 @@ class BugRepository:
     def _bug_to_collection_item(self, bug: Bug) -> Dict[str, Any]:
         """Transform Bug model to collection item format.
         
+        Collection DB only supports name, description, and created_at fields.
+        We store the bug title in 'name' and all other fields as JSON in 'description'.
+        
         Args:
             bug: Bug model instance
             
         Returns:
             Dictionary in collection item format
         """
-        return {
+        # Store structured data as JSON in description field
+        data = {
             "type": self._entity_type,
-            "title": bug.title,
             "description": bug.description,
             "status": bug.status.value,
             "priority": bug.priority.value,
@@ -48,12 +52,19 @@ class BugRepository:
             "assignedTo": bug.assignedTo,
             "tags": bug.tags,
             "validated": bug.validated,
-            "createdAt": bug.createdAt.isoformat(),
             "updatedAt": bug.updatedAt.isoformat()
+        }
+        
+        return {
+            "name": bug.title,  # Bug title goes in name field
+            "description": json.dumps(data),  # All other fields as JSON
+            "created_at": bug.createdAt.isoformat()
         }
 
     def _collection_item_to_bug(self, item: Dict[str, Any]) -> Bug:
         """Transform collection item to Bug model.
+        
+        Parses the JSON-encoded description field to extract bug data.
         
         Args:
             item: Collection item dictionary
@@ -62,41 +73,97 @@ class BugRepository:
             Bug model instance
             
         Raises:
-            ValueError: If datetime fields have unexpected types
+            ValueError: If description field is malformed or required fields are missing
         """
+        from datetime import timezone
+        
+        # Check if response is wrapped in a payload structure
+        if isinstance(item, dict) and "payload" in item:
+            logger.debug("Extracting payload from item response")
+            item = item["payload"]
+        
         # Handle __auto_id__ from AppFlyte
-        if "__auto_id__" in item and "_id" not in item:
-            item["_id"] = item["__auto_id__"]
+        bug_id = item.get("__auto_id__")
         
-        # Parse createdAt with robust type checking
-        created_at = item.get("createdAt")
+        # Parse JSON from description field (workaround for limited schema)
+        description_field = item.get("description", "{}")
+        
+        try:
+            data = json.loads(description_field) if isinstance(description_field, str) else {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse description as JSON for bug {bug_id}: {e}")
+            raise ValueError(
+                f"Invalid bug data for bug_id '{bug_id}': "
+                f"description field contains malformed JSON - {str(e)}"
+            )
+        
+        # Extract bug title from name field
+        title = item.get("name", "")
+        
+        # Extract fields from JSON data
+        description = data.get("description", "")
+        status = data.get("status", "Open")
+        priority = data.get("priority", "Medium")
+        severity = data.get("severity", "Minor")
+        project_id = data.get("projectId", "")
+        reported_by = data.get("reportedBy", "")
+        assigned_to = data.get("assignedTo")
+        tags = data.get("tags", [])
+        validated = data.get("validated", False)
+        
+        # Parse created_at with robust type checking
+        created_at = item.get("created_at")
         if created_at is None:
-            pass  # Leave as None
+            created_at = datetime.now(timezone.utc)
         elif isinstance(created_at, datetime):
-            pass  # Already a datetime, no parsing needed
+            pass  # Already a datetime
         elif isinstance(created_at, str):
-            item["createdAt"] = datetime.fromisoformat(created_at)
+            try:
+                created_at = datetime.fromisoformat(created_at)
+            except ValueError:
+                logger.warning(f"Invalid datetime format for bug {bug_id}, using current time")
+                created_at = datetime.now(timezone.utc)
         else:
-            raise ValueError(
-                f"Invalid type for createdAt: expected str, datetime, or None, "
-                f"got {type(created_at).__name__}"
+            logger.warning(
+                f"Unexpected type for created_at in bug {bug_id}: {type(created_at).__name__}, "
+                f"using current time"
             )
+            created_at = datetime.now(timezone.utc)
         
-        # Parse updatedAt with robust type checking
-        updated_at = item.get("updatedAt")
+        # Parse updatedAt from JSON data
+        updated_at = data.get("updatedAt")
         if updated_at is None:
-            pass  # Leave as None
+            updated_at = created_at  # Default to created_at
         elif isinstance(updated_at, datetime):
-            pass  # Already a datetime, no parsing needed
+            pass  # Already a datetime
         elif isinstance(updated_at, str):
-            item["updatedAt"] = datetime.fromisoformat(updated_at)
+            try:
+                updated_at = datetime.fromisoformat(updated_at)
+            except ValueError:
+                logger.warning(f"Invalid datetime format for updatedAt in bug {bug_id}, using created_at")
+                updated_at = created_at
         else:
-            raise ValueError(
-                f"Invalid type for updatedAt: expected str, datetime, or None, "
-                f"got {type(updated_at).__name__}"
+            logger.warning(
+                f"Unexpected type for updatedAt in bug {bug_id}: {type(updated_at).__name__}, "
+                f"using created_at"
             )
+            updated_at = created_at
         
-        return Bug(**item)
+        return Bug(
+            _id=bug_id,
+            title=title,
+            description=description,
+            projectId=project_id,
+            reportedBy=reported_by,
+            assignedTo=assigned_to,
+            status=status,
+            priority=priority,
+            severity=severity,
+            tags=tags,
+            validated=validated,
+            createdAt=created_at,
+            updatedAt=updated_at
+        )
 
     async def create(self, bug: Bug) -> Bug:
         """Create a new bug.
@@ -163,22 +230,37 @@ class BugRepository:
         # Fetch all items from collection (filtering not supported by service)
         items = await self._service.get_all_items(self._collection)
         
-        # Filter items in-memory
+        # Filter items in-memory (data is in JSON description field)
         filtered_items = []
         for item in items:
-            # Check type
-            if item.get("type") != self._entity_type:
+            description = item.get("description", "")
+            
+            # Skip empty descriptions
+            if not description:
                 continue
             
-            # Apply filters
-            if project_id is not None and item.get("projectId") != project_id:
+            # Parse JSON and check type
+            try:
+                data = json.loads(description) if isinstance(description, str) else {}
+                
+                # Only process items with matching type
+                if data.get("type") != self._entity_type:
+                    continue
+                
+                # Apply filters
+                if project_id is not None and data.get("projectId") != project_id:
+                    continue
+                if status is not None and data.get("status") != status.value:
+                    continue
+                if assigned_to is not None and data.get("assignedTo") != assigned_to:
+                    continue
+                
+                filtered_items.append(item)
+                
+            except json.JSONDecodeError as e:
+                # Log parsing failures
+                logger.warning(f"Failed to parse description as JSON: {e}")
                 continue
-            if status is not None and item.get("status") != status.value:
-                continue
-            if assigned_to is not None and item.get("assignedTo") != assigned_to:
-                continue
-            
-            filtered_items.append(item)
 
         # Transform to Bug models
         bugs = [self._collection_item_to_bug(item) for item in filtered_items]
@@ -206,9 +288,21 @@ class BugRepository:
         """
         logger.info(f"Updating bug status: {bug_id} -> {status.value}")
         
+        # Get current bug
+        current_bug = await self.get_by_id(bug_id)
+        if not current_bug:
+            raise ValueError(f"Bug with ID {bug_id} not found")
+        
+        # Update fields
+        current_bug.status = status
+        current_bug.updatedAt = updated_at
+        
+        # Reconstruct collection item with updated JSON
+        item_data = self._bug_to_collection_item(current_bug)
+        
+        # Update only the description field (which contains the JSON)
         updates = {
-            "status": status.value,
-            "updatedAt": updated_at.isoformat()
+            "description": item_data["description"]
         }
         
         updated_item = await self._service.update_item(self._collection, bug_id, updates)
@@ -235,9 +329,21 @@ class BugRepository:
         """
         logger.info(f"Updating bug assignment: {bug_id} -> {assigned_to}")
         
+        # Get current bug
+        current_bug = await self.get_by_id(bug_id)
+        if not current_bug:
+            raise ValueError(f"Bug with ID {bug_id} not found")
+        
+        # Update fields
+        current_bug.assignedTo = assigned_to
+        current_bug.updatedAt = updated_at
+        
+        # Reconstruct collection item with updated JSON
+        item_data = self._bug_to_collection_item(current_bug)
+        
+        # Update only the description field (which contains the JSON)
         updates = {
-            "assignedTo": assigned_to,
-            "updatedAt": updated_at.isoformat()
+            "description": item_data["description"]
         }
         
         updated_item = await self._service.update_item(self._collection, bug_id, updates)
@@ -264,9 +370,21 @@ class BugRepository:
         """
         logger.info(f"Updating bug validation: {bug_id} -> {validated}")
         
+        # Get current bug
+        current_bug = await self.get_by_id(bug_id)
+        if not current_bug:
+            raise ValueError(f"Bug with ID {bug_id} not found")
+        
+        # Update fields
+        current_bug.validated = validated
+        current_bug.updatedAt = updated_at
+        
+        # Reconstruct collection item with updated JSON
+        item_data = self._bug_to_collection_item(current_bug)
+        
+        # Update only the description field (which contains the JSON)
         updates = {
-            "validated": validated,
-            "updatedAt": updated_at.isoformat()
+            "description": item_data["description"]
         }
         
         updated_item = await self._service.update_item(self._collection, bug_id, updates)
@@ -295,15 +413,25 @@ class BugRepository:
         if not updates:
             raise ValueError("updates cannot be empty")
         
-        # Serialize datetime and enum values
-        serialized_updates = {}
-        for key, value in updates.items():
-            if isinstance(value, datetime):
-                serialized_updates[key] = value.isoformat()
-            elif hasattr(value, 'value'):  # Enum
-                serialized_updates[key] = value.value
-            else:
-                serialized_updates[key] = value
+        # Get current bug
+        current_bug = await self.get_by_id(bug_id)
+        if not current_bug:
+            raise ValueError(f"Bug with ID {bug_id} not found")
         
-        updated_item = await self._service.update_item(self._collection, bug_id, serialized_updates)
+        # Apply updates to bug model
+        for key, value in updates.items():
+            if hasattr(current_bug, key):
+                setattr(current_bug, key, value)
+            else:
+                logger.warning(f"Ignoring unknown field: {key}")
+        
+        # Reconstruct collection item with updated JSON
+        item_data = self._bug_to_collection_item(current_bug)
+        
+        # Update only the description field (which contains the JSON)
+        collection_updates = {
+            "description": item_data["description"]
+        }
+        
+        updated_item = await self._service.update_item(self._collection, bug_id, collection_updates)
         return self._collection_item_to_bug(updated_item)

@@ -153,7 +153,7 @@ export default function ProjectBugsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <p className="text-muted-foreground">Loading project...</p>
@@ -165,7 +165,7 @@ export default function ProjectBugsPage() {
 
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <p className="text-destructive">{error || 'Project not found'}</p>
@@ -186,7 +186,7 @@ export default function ProjectBugsPage() {
   const stats = getProjectStats();
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header with back button */}
         <div className="flex items-center gap-4">
@@ -203,9 +203,11 @@ export default function ProjectBugsPage() {
                 <CardTitle className="text-2xl">{project.name}</CardTitle>
                 <p className="text-muted-foreground mt-2">{project.description}</p>
               </div>
-              <Button onClick={handleCreateBug}>
-                Create Bug
-              </Button>
+              {currentUser && (
+                <Button onClick={handleCreateBug}>
+                  Create Bug
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>

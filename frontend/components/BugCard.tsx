@@ -20,8 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bug, BugStatus, BugPriority } from "@/utils/types";
+import { Bug, BugStatus, BugPriority, UserRole } from "@/utils/types";
 import { getInitials } from "@/lib/utils";
+import { useUser, usePermission } from "@/contexts/UserContext";
 
 interface BugCardProps {
   bug: Bug;
@@ -80,6 +81,11 @@ export const BugCard: React.FC<BugCardProps> = ({
   onStatusUpdate,
   onViewDetails,
 }) => {
+  const { currentUser } = useUser();
+  const canUpdateStatus = usePermission('canUpdateStatus');
+  const canValidateBug = usePermission('canValidateBug');
+  const canCloseBug = usePermission('canCloseBug');
+
   const handleStatusChange = (newStatus: BugStatus) => {
     if (onStatusUpdate) {
       onStatusUpdate(bug._id, newStatus);
@@ -161,35 +167,41 @@ export const BugCard: React.FC<BugCardProps> = ({
       </CardContent>
 
       <CardFooter className="gap-2">
-        {/* Quick action buttons */}
-        {bug.status === BugStatus.OPEN && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleStatusChange(BugStatus.IN_PROGRESS)}
-          >
-            Start Progress
-          </Button>
-        )}
+        {/* Role-based quick action buttons */}
+        {currentUser && (
+          <>
+            {/* Developer-specific: Status update controls */}
+            {canUpdateStatus && bug.status === BugStatus.OPEN && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStatusChange(BugStatus.IN_PROGRESS)}
+              >
+                Start Progress
+              </Button>
+            )}
 
-        {bug.status === BugStatus.IN_PROGRESS && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleStatusChange(BugStatus.RESOLVED)}
-          >
-            Mark Resolved
-          </Button>
-        )}
+            {canUpdateStatus && bug.status === BugStatus.IN_PROGRESS && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStatusChange(BugStatus.RESOLVED)}
+              >
+                Mark Resolved
+              </Button>
+            )}
 
-        {bug.status === BugStatus.RESOLVED && bug.validated && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleStatusChange(BugStatus.CLOSED)}
-          >
-            Close Bug
-          </Button>
+            {/* Tester-specific: Validation and closure controls */}
+            {canCloseBug && bug.status === BugStatus.RESOLVED && bug.validated && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStatusChange(BugStatus.CLOSED)}
+              >
+                Close Bug
+              </Button>
+            )}
+          </>
         )}
 
         <Button

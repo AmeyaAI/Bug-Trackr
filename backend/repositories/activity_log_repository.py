@@ -3,6 +3,7 @@
 from typing import List, Dict, Any
 from datetime import datetime
 import logging
+import json
 
 from backend.models.bug_model import ActivityLog
 from backend.services.collection_db import CollectionDBService
@@ -30,22 +31,33 @@ class ActivityLogRepository:
     def _activity_log_to_collection_item(self, activity_log: ActivityLog) -> Dict[str, Any]:
         """Transform ActivityLog model to collection item format.
         
+        Collection DB only supports name, description, and created_at fields.
+        We store a display identifier in 'name' and all log data as JSON in 'description'.
+        
         Args:
             activity_log: ActivityLog model instance
             
         Returns:
             Dictionary in collection item format
         """
-        return {
+        # Store structured data as JSON in description field
+        data = {
             "type": self._entity_type,
             "bugId": activity_log.bugId,
             "action": activity_log.action,
-            "performedBy": activity_log.performedBy,
-            "timestamp": activity_log.timestamp.isoformat()
+            "performedBy": activity_log.performedBy
+        }
+        
+        return {
+            "name": f"{activity_log.action} on bug {activity_log.bugId}",  # Display identifier
+            "description": json.dumps(data),  # All log data as JSON
+            "created_at": activity_log.timestamp.isoformat()
         }
 
     def _collection_item_to_activity_log(self, item: Dict[str, Any]) -> ActivityLog:
         """Transform collection item to ActivityLog model.
+        
+        Parses the JSON-encoded description field to extract activity log data.
         
         Args:
             item: Collection item dictionary
@@ -54,27 +66,61 @@ class ActivityLogRepository:
             ActivityLog model instance
             
         Raises:
-            ValueError: If datetime fields have unexpected types
+            ValueError: If description field is malformed or required fields are missing
         """
-        # Handle __auto_id__ from AppFlyte
-        if "__auto_id__" in item:
-            item["_id"] = item.pop("__auto_id__")
+        from datetime import timezone
         
-        # Parse timestamp with robust type checking
-        timestamp = item.get("timestamp")
-        if timestamp is None:
-            pass  # Leave as None
-        elif isinstance(timestamp, datetime):
-            pass  # Already a datetime, no parsing needed
-        elif isinstance(timestamp, str):
-            item["timestamp"] = datetime.fromisoformat(timestamp)
-        else:
+        # Check if response is wrapped in a payload structure
+        if isinstance(item, dict) and "payload" in item:
+            logger.debug("Extracting payload from item response")
+            item = item["payload"]
+        
+        # Handle __auto_id__ from AppFlyte
+        log_id = item.get("__auto_id__")
+        
+        # Parse JSON from description field
+        description_field = item.get("description", "{}")
+        
+        try:
+            data = json.loads(description_field) if isinstance(description_field, str) else {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse description as JSON for activity log {log_id}: {e}")
             raise ValueError(
-                f"Invalid type for timestamp: expected str, datetime, or None, "
-                f"got {type(timestamp).__name__}"
+                f"Invalid activity log data for log_id '{log_id}': "
+                f"description field contains malformed JSON - {str(e)}"
             )
         
-        return ActivityLog(**item)
+        # Extract fields from JSON data
+        bug_id = data.get("bugId", "")
+        action = data.get("action", "")
+        performed_by = data.get("performedBy", "")
+        
+        # Parse created_at (timestamp) with robust type checking
+        timestamp = item.get("created_at")
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        elif isinstance(timestamp, datetime):
+            pass  # Already a datetime
+        elif isinstance(timestamp, str):
+            try:
+                timestamp = datetime.fromisoformat(timestamp)
+            except ValueError:
+                logger.warning(f"Invalid datetime format for activity log {log_id}, using current time")
+                timestamp = datetime.now(timezone.utc)
+        else:
+            logger.warning(
+                f"Unexpected type for created_at in activity log {log_id}: {type(timestamp).__name__}, "
+                f"using current time"
+            )
+            timestamp = datetime.now(timezone.utc)
+        
+        return ActivityLog(
+            _id=log_id,
+            bugId=bug_id,
+            action=action,
+            performedBy=performed_by,
+            timestamp=timestamp
+        )
 
     async def create(self, activity_log: ActivityLog) -> ActivityLog:
         """Create a new activity log entry.
@@ -112,12 +158,38 @@ class ActivityLogRepository:
         """
         logger.info(f"Retrieving activity logs for bug: {bug_id}")
         
-        # Fetch only activity logs for the given bug ID from collection
-        filter_dict = {"type": self._entity_type, "bugId": bug_id}
-        items = await self._service.get_items_by_filter(self._collection, filter_dict)
+        # Fetch all items from collection
+        items = await self._service.get_all_items(self._collection)
+        
+        # Filter items in-memory (since data is in JSON description field)
+        filtered_items = []
+        for item in items:
+            description = item.get("description", "")
+            
+            # Skip empty descriptions
+            if not description:
+                continue
+            
+            # Parse JSON and check type and bugId
+            try:
+                data = json.loads(description)
+                
+                # Only process items with matching type and bugId
+                if data.get("type") == self._entity_type and data.get("bugId") == bug_id:
+                    try:
+                        filtered_items.append(item)
+                    except ValueError as e:
+                        # Skip malformed activity log data but log the error
+                        logger.warning(f"Skipping malformed activity log data: {e}")
+                        continue
+                        
+            except json.JSONDecodeError as e:
+                # Log parsing failures
+                logger.warning(f"Failed to parse description as JSON: {e}")
+                continue
         
         # Transform to ActivityLog models
-        logs = [self._collection_item_to_activity_log(item) for item in items]
+        logs = [self._collection_item_to_activity_log(item) for item in filtered_items]
         
         # Sort by timestamp (newest first)
         logs.sort(key=lambda l: l.timestamp, reverse=True)

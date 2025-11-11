@@ -69,32 +69,17 @@ async def create_comment(
         # Create comment in repository
         created_comment = await services.comment_repository.create(comment)
         
-        # Attempt to update parent bug timestamp with compensating rollback
+        # Attempt to update parent bug timestamp (best effort, don't fail if it doesn't work)
         try:
             await services.bug_repository.update_fields(
                 comment_request.bugId,
                 {"updatedAt": now}
             )
         except Exception as bug_update_error:
-            # Rollback: Delete the created comment to maintain consistency
-            logger.error(
-                f"Failed to update bug timestamp after comment creation. "
-                f"Rolling back comment {created_comment.id}: {bug_update_error}"
-            )
-            try:
-                await services.comment_repository.delete(created_comment.id)
-                logger.info(f"Successfully rolled back comment {created_comment.id}")
-            except Exception as rollback_error:
-                logger.critical(
-                    f"CRITICAL: Failed to rollback comment {created_comment.id} "
-                    f"after bug update failure. Manual cleanup required. "
-                    f"Rollback error: {rollback_error}"
-                )
-            
-            # Re-raise with clear error message
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to create comment: bug timestamp update failed"
+            # Log the error but don't fail the comment creation
+            logger.warning(
+                f"Failed to update bug timestamp after comment creation "
+                f"(comment {created_comment.id} was still created successfully): {bug_update_error}"
             )
         
         logger.info(

@@ -115,7 +115,7 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await bugApi.validate(bug._id, currentUser._id);
+      await bugApi.validate(bug._id, currentUser._id, currentUser.role);
       await loadBugDetails(bug._id);
     } catch (err) {
       console.error('Failed to validate bug:', err);
@@ -224,7 +224,7 @@ export default function BugDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="p-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <p className="text-muted-foreground">Loading bug details...</p>
@@ -236,7 +236,7 @@ export default function BugDetailsPage() {
 
   if (error || !bug) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="p-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <p className="text-destructive">{error || 'Bug not found'}</p>
@@ -248,7 +248,7 @@ export default function BugDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="p-8">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header with back button */}
         <div className="flex items-center gap-4">
@@ -311,22 +311,25 @@ export default function BugDetailsPage() {
               </div>
             </div>
 
-            {/* Action buttons */}
-            {currentUser && (
+            {/* Role-based action buttons */}
+            {currentUser && permissions && (
               <div className="flex flex-wrap gap-2 pt-4 border-t">
-                {permissions?.canValidateBug && !bug.validated && bug.status === BugStatus.RESOLVED && (
+                {/* Tester-specific: Validation controls */}
+                {permissions.canValidateBug && !bug.validated && bug.status === BugStatus.RESOLVED && (
                   <Button onClick={handleValidate} disabled={isSubmitting}>
-                    Validate Bug
+                    ✓ Validate Bug
                   </Button>
                 )}
                 
-                {permissions?.canCloseBug && bug.validated && bug.status !== BugStatus.CLOSED && (
-                  <Button onClick={handleClose} disabled={isSubmitting}>
+                {/* Tester-specific: Closure controls */}
+                {permissions.canCloseBug && bug.validated && bug.status !== BugStatus.CLOSED && (
+                  <Button onClick={handleClose} disabled={isSubmitting} variant="secondary">
                     Close Bug
                   </Button>
                 )}
                 
-                {permissions?.canAssignBug && (
+                {/* Developer-specific: Assignment controls */}
+                {permissions.canAssignBug && bug.status !== BugStatus.CLOSED && (
                   <Button 
                     variant="outline" 
                     onClick={() => {
@@ -339,7 +342,8 @@ export default function BugDetailsPage() {
                   </Button>
                 )}
                 
-                {permissions?.canUpdateStatus && bug.status !== BugStatus.CLOSED && (
+                {/* Developer-specific: Status update controls */}
+                {permissions.canUpdateStatus && bug.status !== BugStatus.CLOSED && (
                   <Button 
                     variant="outline" 
                     onClick={() => {
@@ -351,6 +355,25 @@ export default function BugDetailsPage() {
                     Update Status
                   </Button>
                 )}
+
+                {/* Show message if no actions available */}
+                {!permissions.canValidateBug && 
+                 !permissions.canCloseBug && 
+                 !permissions.canAssignBug && 
+                 !permissions.canUpdateStatus && (
+                  <p className="text-sm text-muted-foreground">
+                    No actions available for your role
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Prompt to select user if not logged in */}
+            {!currentUser && (
+              <div className="pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Please select a user from the navigation to perform actions
+                </p>
               </div>
             )}
           </CardContent>

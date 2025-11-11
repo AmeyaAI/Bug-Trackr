@@ -170,10 +170,14 @@ export const bugApi = {
     formData.append('description', data.description);
     formData.append('projectId', data.projectId);
     formData.append('reportedBy', data.reportedBy);
-    formData.append('priority', String(data.priority));
-    formData.append('severity', String(data.severity));
+    formData.append('priority', data.priority);
+    formData.append('severity', data.severity);
     
-    const response = await apiClient.post<BugResponse>('/api/bugs', formData);
+    const response = await apiClient.post<BugResponse>('/api/bugs', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return transformDates(response.data);
   },
 
@@ -191,8 +195,17 @@ export const bugApi = {
   /**
    * Validate bug (tester only)
    */
-  validate: async (id: string, userId: string): Promise<StatusUpdateResponse> => {
-    const response = await apiClient.patch<StatusUpdateResponse>(`/api/bugs/${id}/validate`, { userId });
+  validate: async (id: string, userId: string, userRole: string = 'tester'): Promise<StatusUpdateResponse> => {
+    // Backend expects form data
+    const formData = new FormData();
+    formData.append('userId', userId);
+    formData.append('userRole', userRole);
+    
+    const response = await apiClient.patch<StatusUpdateResponse>(`/api/bugs/${id}/validate`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     if (response.data.bug) {
       response.data.bug = transformDates(response.data.bug);
     }

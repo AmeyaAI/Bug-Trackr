@@ -80,7 +80,7 @@ export default function ProjectsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <p className="text-muted-foreground">Loading projects...</p>
@@ -92,7 +92,7 @@ export default function ProjectsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <p className="text-destructive">{error}</p>
@@ -104,7 +104,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">

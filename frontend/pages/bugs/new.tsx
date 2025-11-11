@@ -129,7 +129,7 @@ export default function NewBugPage() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-background p-8">
+      <div className="p-8">
         <div className="max-w-3xl mx-auto">
           <Card>
             <CardContent className="pt-6">
@@ -147,7 +147,7 @@ export default function NewBugPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
