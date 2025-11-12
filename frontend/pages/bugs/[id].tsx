@@ -28,14 +28,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CommentSection } from '@/components/CommentSection';
-import { bugApi, projectApi, userApi, commentApi } from '@/utils/apiClient';
+import { bugApi, projectApi, userApi, commentApi, handleApiError } from '@/utils/apiClient';
 import { Bug, Comment, BugStatus, BugPriority, Project, User, UserRole, getRolePermissions } from '@/utils/types';
 import { useUser } from '@/contexts/UserContext';
+import { useToast } from '@/contexts/ToastContext';
+import { LoadingState } from '@/components/LoadingState';
+import { handleEventualConsistency } from '@/utils/apiHelpers';
+import { AxiosError } from 'axios';
 
 export default function BugDetailsPage() {
   const router = useRouter();
   const { id } = router.query;
   const { currentUser } = useUser();
+  const toast = useToast();
   
   const [bug, setBug] = useState<Bug | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -44,7 +49,7 @@ export default function BugDetailsPage() {
   const [reportedByUser, setReportedByUser] = useState<User | null>(null);
   const [assignedUser, setAssignedUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // Dialog states
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -61,7 +66,7 @@ export default function BugDetailsPage() {
 
   const loadBugDetails = async (bugId: string) => {
     setIsLoading(true);
-    setError(null);
+    setLoadError(null);
     
     try {
       const [bugData, usersData] = await Promise.all([
@@ -87,7 +92,9 @@ export default function BugDetailsPage() {
       setAssignedUser(assignee || null);
     } catch (err) {
       console.error('Failed to load bug details:', err);
-      setError('Failed to load bug details. Please try again.');
+      const errorMessage = handleApiError(err as AxiosError);
+      setLoadError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -95,18 +102,27 @@ export default function BugDetailsPage() {
 
   const handleAddComment = async (bugId: string, message: string) => {
     if (!currentUser) {
+      toast.error('Please select a user first');
       throw new Error('Please select a user first');
     }
 
-    await commentApi.create({
-      bugId,
-      authorId: currentUser._id,
-      message,
-    });
-    
-    // Reload bug details to get updated comments
-    if (id && typeof id === 'string') {
-      await loadBugDetails(id);
+    try {
+      await commentApi.create({
+        bugId,
+        authorId: currentUser._id,
+        message,
+      });
+      
+      toast.success('Comment added successfully');
+      
+      // Reload bug details to get updated comments
+      if (id && typeof id === 'string') {
+        await loadBugDetails(id);
+      }
+    } catch (err) {
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
+      throw err;
     }
   };
 
@@ -115,11 +131,15 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await bugApi.validate(bug._id, currentUser._id, currentUser.role);
-      await loadBugDetails(bug._id);
+      await handleEventualConsistency(
+        () => bugApi.validate(bug._id, currentUser._id, currentUser.role),
+        () => loadBugDetails(bug._id)
+      );
+      toast.success('Bug validated successfully');
     } catch (err) {
       console.error('Failed to validate bug:', err);
-      alert('Failed to validate bug');
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -129,21 +149,25 @@ export default function BugDetailsPage() {
     if (!currentUser || !bug) return;
     
     if (!bug.validated) {
-      alert('Bug must be validated before closing');
+      toast.warning('Bug must be validated before closing');
       return;
     }
     
     setIsSubmitting(true);
     try {
-      await bugApi.updateStatus(bug._id, {
-        status: BugStatus.CLOSED,
-        userId: currentUser._id,
-        userRole: currentUser.role as any,
-      });
-      await loadBugDetails(bug._id);
+      await handleEventualConsistency(
+        () => bugApi.updateStatus(bug._id, {
+          status: BugStatus.CLOSED,
+          userId: currentUser._id,
+          userRole: currentUser.role as any,
+        }),
+        () => loadBugDetails(bug._id)
+      );
+      toast.success('Bug closed successfully');
     } catch (err) {
       console.error('Failed to close bug:', err);
-      alert('Failed to close bug');
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -154,16 +178,20 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await bugApi.assign(bug._id, {
-        assignedTo: selectedAssignee,
-        assignedBy: currentUser._id,
-      });
-      await loadBugDetails(bug._id);
+      await handleEventualConsistency(
+        () => bugApi.assign(bug._id, {
+          assignedTo: selectedAssignee,
+          assignedBy: currentUser._id,
+        }),
+        () => loadBugDetails(bug._id)
+      );
+      toast.success('Bug assigned successfully');
       setShowAssignDialog(false);
       setSelectedAssignee('');
     } catch (err) {
       console.error('Failed to assign bug:', err);
-      alert('Failed to assign bug');
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -174,17 +202,21 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await bugApi.updateStatus(bug._id, {
-        status: selectedStatus,
-        userId: currentUser._id,
-        userRole: currentUser.role as any,
-      });
-      await loadBugDetails(bug._id);
+      await handleEventualConsistency(
+        () => bugApi.updateStatus(bug._id, {
+          status: selectedStatus,
+          userId: currentUser._id,
+          userRole: currentUser.role as any,
+        }),
+        () => loadBugDetails(bug._id)
+      );
+      toast.success('Bug status updated successfully');
       setShowStatusDialog(false);
       setSelectedStatus(null);
     } catch (err) {
       console.error('Failed to update status:', err);
-      alert('Failed to update bug status');
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -223,23 +255,15 @@ export default function BugDetailsPage() {
   const permissions = currentUser ? getRolePermissions(currentUser.role as UserRole) : null;
 
   if (isLoading) {
-    return (
-      <div className="p-8">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading bug details...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading bug details..." fullScreen />;
   }
 
-  if (error || !bug) {
+  if (loadError || !bug) {
     return (
       <div className="p-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col items-center justify-center h-64 gap-4">
-            <p className="text-destructive">{error || 'Bug not found'}</p>
+            <p className="text-destructive">{loadError || 'Bug not found'}</p>
             <Button onClick={() => router.push('/bugs')}>Back to Bugs</Button>
           </div>
         </div>

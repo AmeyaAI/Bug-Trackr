@@ -19,20 +19,26 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { bugApi, projectApi, userApi, commentApi } from '@/utils/apiClient';
+import { bugApi, projectApi, userApi, commentApi, handleApiError } from '@/utils/apiClient';
 import { Bug, BugStatus, BugPriority, Project, User } from '@/utils/types';
 import { useUser } from '@/contexts/UserContext';
+import { useToast } from '@/contexts/ToastContext';
+import { LoadingState } from '@/components/LoadingState';
+import { ApiErrorFallback } from '@/components/ApiErrorFallback';
+import { handleEventualConsistency } from '@/utils/apiHelpers';
+import { AxiosError } from 'axios';
 
 export default function BugsPage() {
   const router = useRouter();
   const { currentUser } = useUser();
+  const toast = useToast();
   
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<Error | null>(null);
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -45,7 +51,7 @@ export default function BugsPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    setError(null);
+    setLoadError(null);
     
     try {
       const [bugsData, projectsData, usersData] = await Promise.all([
@@ -73,7 +79,7 @@ export default function BugsPage() {
       setCommentCounts(counts);
     } catch (err) {
       console.error('Failed to load bugs:', err);
-      setError('Failed to load bugs. Please try again.');
+      setLoadError(err as Error);
     } finally {
       setIsLoading(false);
     }
@@ -81,22 +87,25 @@ export default function BugsPage() {
 
   const handleStatusUpdate = async (bugId: string, newStatus: BugStatus) => {
     if (!currentUser) {
-      alert('Please select a user first');
+      toast.warning('Please select a user first');
       return;
     }
 
     try {
-      await bugApi.updateStatus(bugId, {
-        status: newStatus,
-        userId: currentUser._id,
-        userRole: currentUser.role as any,
-      });
+      await handleEventualConsistency(
+        () => bugApi.updateStatus(bugId, {
+          status: newStatus,
+          userId: currentUser._id,
+          userRole: currentUser.role as any,
+        }),
+        () => loadData()
+      );
       
-      // Reload bugs to reflect changes
-      await loadData();
+      toast.success('Bug status updated successfully');
     } catch (err) {
       console.error('Failed to update status:', err);
-      alert('Failed to update bug status');
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
     }
   };
 
@@ -127,25 +136,18 @@ export default function BugsPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading bugs...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading bugs..." fullScreen />;
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center justify-center h-64 gap-4">
-            <p className="text-destructive">{error}</p>
-            <Button onClick={loadData}>Retry</Button>
-          </div>
+          <ApiErrorFallback
+            error={loadError}
+            onRetry={loadData}
+            title="Failed to load bugs"
+          />
         </div>
       </div>
     );

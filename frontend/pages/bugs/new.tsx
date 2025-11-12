@@ -28,9 +28,12 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { bugApi, projectApi } from "@/utils/apiClient";
+import { bugApi, projectApi, handleApiError } from "@/utils/apiClient";
 import { BugPriority, BugSeverity, Project } from "@/utils/types";
 import { useUser } from "@/contexts/UserContext";
+import { useToast } from "@/contexts/ToastContext";
+import { LoadingState } from "@/components/LoadingState";
+import { AxiosError } from "axios";
 
 interface BugFormData {
   title: string;
@@ -43,11 +46,11 @@ interface BugFormData {
 export default function NewBugPage() {
   const router = useRouter();
   const { currentUser } = useUser();
+  const toast = useToast();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -76,10 +79,12 @@ export default function NewBugPage() {
       setProjects(projectsData);
     } catch (err) {
       console.error("Failed to load projects:", err);
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
     } finally {
       setIsLoadingProjects(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadProjects();
@@ -94,12 +99,11 @@ export default function NewBugPage() {
 
   const onSubmit = async (data: BugFormData) => {
     if (!currentUser) {
-      setSubmitError("Please select a user first");
+      toast.error("Please select a user first");
       return;
     }
 
     setIsSubmitting(true);
-    setSubmitError(null);
 
     try {
       const newBug = await bugApi.create({
@@ -111,13 +115,13 @@ export default function NewBugPage() {
         severity: data.severity,
       });
 
+      toast.success("Bug created successfully!");
       // Navigate to the newly created bug
       router.push(`/bugs/${newBug._id}`);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to create bug:", err);
-      setSubmitError(
-        err.response?.data?.detail || "Failed to create bug. Please try again."
-      );
+      const errorMessage = handleApiError(err as AxiosError);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -326,13 +330,6 @@ export default function NewBugPage() {
                   className="bg-muted"
                 />
               </div>
-
-              {/* Submit error */}
-              {submitError && (
-                <div className="p-4 bg-destructive/10 border border-destructive rounded-md">
-                  <p className="text-sm text-destructive">{submitError}</p>
-                </div>
-              )}
             </CardContent>
 
             <CardFooter className="flex justify-end gap-2">

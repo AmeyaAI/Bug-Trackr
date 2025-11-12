@@ -21,6 +21,24 @@ import type {
   ProjectResponse,
 } from './types';
 
+// Track request count for loading state
+let activeRequests = 0;
+const requestListeners: Array<(count: number) => void> = [];
+
+export const subscribeToRequestCount = (listener: (count: number) => void) => {
+  requestListeners.push(listener);
+  return () => {
+    const index = requestListeners.indexOf(listener);
+    if (index > -1) {
+      requestListeners.splice(index, 1);
+    }
+  };
+};
+
+const notifyRequestListeners = () => {
+  requestListeners.forEach(listener => listener(activeRequests));
+};
+
 // API configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -36,6 +54,10 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Track active requests
+    activeRequests++;
+    notifyRequestListeners();
+    
     // Log request in development
     if (process.env.NODE_ENV === 'development') {
       console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
@@ -43,6 +65,8 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error: AxiosError) => {
+    activeRequests--;
+    notifyRequestListeners();
     console.error('[API Request Error]', error);
     return Promise.reject(error);
   }
@@ -51,6 +75,10 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    // Track active requests
+    activeRequests--;
+    notifyRequestListeners();
+    
     // Log response in development
     if (process.env.NODE_ENV === 'development') {
       console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.status);
@@ -58,6 +86,10 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError<ApiErrorResponse>) => {
+    // Track active requests
+    activeRequests--;
+    notifyRequestListeners();
+    
     // Handle errors
     const errorMessage = handleApiError(error);
     console.error('[API Response Error]', errorMessage);

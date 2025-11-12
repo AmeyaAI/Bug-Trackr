@@ -104,6 +104,9 @@ class CommentRepository:
         elif isinstance(created_at, str):
             try:
                 created_at = datetime.fromisoformat(created_at)
+                # Ensure timezone-aware
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
             except ValueError:
                 logger.warning(f"Invalid datetime format for comment {comment_id}, using current time")
                 created_at = datetime.now(timezone.utc)
@@ -112,8 +115,7 @@ class CommentRepository:
                 f"Unexpected type for created_at in comment {comment_id}: {type(created_at).__name__}, "
                 f"using current time"
             )
-            created_at = datetime.now(timezone.utc)
-        
+            created_at = datetime.now(timezone.utc)        
         return Comment(
             _id=comment_id,
             bugId=bug_id,
@@ -192,14 +194,13 @@ class CommentRepository:
             try:
                 data = json.loads(description)
                 
-                # Only process items with matching type and bugId
-                if data.get("type") == self._entity_type and data.get("bugId") == bug_id:
-                    try:
-                        filtered_items.append(item)
-                    except ValueError as e:
-                        # Skip malformed comment data but log the error
-                        logger.warning(f"Skipping malformed comment data: {e}")
-                        continue
+                # Check if this is a comment (has type field)
+                if data.get("type") != self._entity_type:
+                    continue
+                
+                # Check if bugId matches
+                if data.get("bugId") == bug_id:
+                    filtered_items.append(item)
                         
             except json.JSONDecodeError as e:
                 # Log parsing failures
@@ -214,3 +215,23 @@ class CommentRepository:
         
         logger.info(f"Retrieved {len(comments)} comments for bug {bug_id}")
         return comments
+
+    async def delete(self, comment_id: str) -> bool:
+        """Delete a comment by ID.
+        
+        Args:
+            comment_id: Comment ID (__auto_id__)
+            
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        logger.info(f"Deleting comment: {comment_id}")
+        
+        success = await self._service.delete_item(self._collection, comment_id)
+        
+        if success:
+            logger.info(f"Comment deleted: {comment_id}")
+        else:
+            logger.warning(f"Failed to delete comment: {comment_id}")
+        
+        return success

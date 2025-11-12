@@ -435,3 +435,23 @@ class BugRepository:
         
         updated_item = await self._service.update_item(self._collection, bug_id, collection_updates)
         return self._collection_item_to_bug(updated_item)
+
+    async def delete(self, bug_id: str) -> bool:
+        """Delete a bug by ID.
+        
+        Args:
+            bug_id: Bug ID (__auto_id__)
+            
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        logger.info(f"Deleting bug: {bug_id}")
+        
+        success = await self._service.delete_item(self._collection, bug_id)
+        
+        if success:
+            logger.info(f"Bug deleted: {bug_id}")
+        else:
+            logger.warning(f"Failed to delete bug: {bug_id}")
+        
+        return success

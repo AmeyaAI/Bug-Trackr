@@ -72,6 +72,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
       setNewComment('');
     } catch (error) {
       console.error('Failed to add comment:', error);
+      // Error is already handled by parent component with toast
     } finally {
       setIsSubmitting(false);
     }

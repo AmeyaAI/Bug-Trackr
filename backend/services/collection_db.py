@@ -392,15 +392,14 @@ class AppFlyteCollectionDB(CollectionDBService):
         logger.info(f"Updating item in collection '{singular_name or 'base'}' with {len(fields)} field(s)")
         result = await self._make_request("PUT", url, request_body)
         
-        if result is None:
-            raise ValueError(f"Failed to update item: item '{item_id}' not found in collection '{singular_name or 'base'}'")
-        
-        # If result is an empty dict, we need to fetch the updated item
-        if isinstance(result, dict) and not result:
-            logger.warning("Update returned empty response, fetching updated item")
+        # Collection DB API quirk: PUT returns 404 even when update succeeds
+        # We need to fetch the item to verify and return the updated data
+        if result is None or (isinstance(result, dict) and not result):
+            logger.warning("Update returned None or empty response, fetching updated item to verify")
             result = await self.get_item_by_id(collection_name, item_id)
             if result is None:
                 raise ValueError(f"Failed to retrieve updated item: item '{item_id}' not found in collection '{singular_name or 'base'}'")
+            logger.info(f"Successfully verified update for item in collection '{singular_name or 'base'}'")
             return result
         
         # Check if response is wrapped in a payload structure
