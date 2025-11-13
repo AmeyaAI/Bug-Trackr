@@ -28,11 +28,10 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { bugApi, projectApi, handleApiError } from "@/utils/apiClient";
+import { bugApi, projectApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
 import { BugPriority, BugSeverity, Project } from "@/utils/types";
 import { useUser } from "@/contexts/UserContext";
 import { useToast } from "@/contexts/ToastContext";
-import { LoadingState } from "@/components/LoadingState";
 import { AxiosError } from "axios";
 
 interface BugFormData {
@@ -79,7 +78,7 @@ export default function NewBugPage() {
       setProjects(projectsData);
     } catch (err) {
       console.error("Failed to load projects:", err);
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
     } finally {
       setIsLoadingProjects(false);
@@ -120,7 +119,7 @@ export default function NewBugPage() {
       router.push(`/bugs/${newBug._id}`);
     } catch (err) {
       console.error("Failed to create bug:", err);
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);

@@ -12,7 +12,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { UserSelector } from '@/components/UserSelector';
-import { useUser } from '@/contexts/UserContext';
 import { useNavbar } from '@/contexts/NavbarContext';
 import { userApi } from '@/utils/apiClient';
 import { User } from '@/utils/types';
@@ -23,7 +22,6 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const router = useRouter();
-  const { currentUser } = useUser();
   const { isNavbarVisible } = useNavbar();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);

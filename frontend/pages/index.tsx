@@ -33,25 +33,26 @@ export default function Home() {
     critical: 0,
     high: 0,
   });
-  const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // Show welcome screen only on first load of the session
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
-      if (!hasSeenWelcome) {
-        setShowWelcome(true);
-        sessionStorage.setItem('hasSeenWelcome', 'true');
+    const checkWelcome = () => {
+      if (typeof window !== 'undefined') {
+        const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
+        if (!hasSeenWelcome) {
+          setShowWelcome(true);
+          sessionStorage.setItem('hasSeenWelcome', 'true');
+        }
       }
-    }
+    };
+    checkWelcome();
   }, []);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
         const [bugsData, projectsData] = await Promise.all([
           bugApi.getAll(),
           projectApi.getAll(),
@@ -75,8 +76,6 @@ export default function Home() {
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
         setDataLoaded(true);
-      } finally {
-        setLoading(false);
       }
     };
 

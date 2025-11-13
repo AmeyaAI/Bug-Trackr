@@ -92,7 +92,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                We encountered an unexpected error. This has been logged and we'll look into it.
+                We encountered an unexpected error. This has been logged and we&apos;ll look into it.
               </p>
 
               {this.props.showDetails && this.state.error && (

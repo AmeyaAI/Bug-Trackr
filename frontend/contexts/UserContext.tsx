@@ -41,18 +41,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Load from localStorage after mount to avoid hydration issues
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('bugtrackr_current_user');
-      if (storedUser) {
-        try {
-          setCurrentUser(JSON.parse(storedUser));
-        } catch (error) {
-          console.error('Failed to parse stored user:', error);
-          localStorage.removeItem('bugtrackr_current_user');
+    const loadStoredUser = () => {
+      if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('bugtrackr_current_user');
+        if (storedUser) {
+          try {
+            setCurrentUser(JSON.parse(storedUser));
+          } catch (error) {
+            console.error('Failed to parse stored user:', error);
+            localStorage.removeItem('bugtrackr_current_user');
+          }
         }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+    
+    loadStoredUser();
   }, []);
 
   const handleSetCurrentUser = (user: User | null) => {

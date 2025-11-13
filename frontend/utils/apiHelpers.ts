@@ -87,7 +87,7 @@ export const handleEventualConsistency = async <T>(
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return await fetchOperation();
-    } catch (fetchError) {
+    } catch {
       throw error; // Throw original error
     }
   }

@@ -7,7 +7,7 @@
  * Requirements: 2.5, 3.1, 3.2, 4.3
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +28,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CommentSection } from '@/components/CommentSection';
-import { bugApi, projectApi, userApi, commentApi, handleApiError } from '@/utils/apiClient';
-import { Bug, Comment, BugStatus, BugPriority, Project, User, UserRole, getRolePermissions } from '@/utils/types';
+import { bugApi, projectApi, userApi, commentApi, handleApiError, ApiErrorResponse } from '@/utils/apiClient';
+import { Bug, Comment, BugStatus, BugPriority, BugSeverity, Project, User, UserRole, getRolePermissions } from '@/utils/types';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/contexts/ToastContext';
 import { LoadingState } from '@/components/LoadingState';
@@ -58,13 +58,7 @@ export default function BugDetailsPage() {
   const [selectedStatus, setSelectedStatus] = useState<BugStatus | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (id && typeof id === 'string') {
-      loadBugDetails(id);
-    }
-  }, [id]);
-
-  const loadBugDetails = async (bugId: string) => {
+  const loadBugDetails = useCallback(async (bugId: string) => {
     setIsLoading(true);
     setLoadError(null);
     
@@ -92,13 +86,19 @@ export default function BugDetailsPage() {
       setAssignedUser(assignee || null);
     } catch (err) {
       console.error('Failed to load bug details:', err);
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       setLoadError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (id && typeof id === 'string') {
+      loadBugDetails(id);
+    }
+  }, [id, loadBugDetails]);
 
   const handleAddComment = async (bugId: string, message: string) => {
     if (!currentUser) {
@@ -120,7 +120,7 @@ export default function BugDetailsPage() {
         await loadBugDetails(id);
       }
     } catch (err) {
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
       throw err;
     }
@@ -138,7 +138,7 @@ export default function BugDetailsPage() {
       toast.success('Bug validated successfully');
     } catch (err) {
       console.error('Failed to validate bug:', err);
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -159,14 +159,14 @@ export default function BugDetailsPage() {
         () => bugApi.updateStatus(bug._id, {
           status: BugStatus.CLOSED,
           userId: currentUser._id,
-          userRole: currentUser.role as any,
+          userRole: currentUser.role as UserRole,
         }),
         () => loadBugDetails(bug._id)
       );
       toast.success('Bug closed successfully');
     } catch (err) {
       console.error('Failed to close bug:', err);
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -190,7 +190,7 @@ export default function BugDetailsPage() {
       setSelectedAssignee('');
     } catch (err) {
       console.error('Failed to assign bug:', err);
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -206,7 +206,7 @@ export default function BugDetailsPage() {
         () => bugApi.updateStatus(bug._id, {
           status: selectedStatus,
           userId: currentUser._id,
-          userRole: currentUser.role as any,
+          userRole: currentUser.role as UserRole,
         }),
         () => loadBugDetails(bug._id)
       );
@@ -215,7 +215,7 @@ export default function BugDetailsPage() {
       setSelectedStatus(null);
     } catch (err) {
       console.error('Failed to update status:', err);
-      const errorMessage = handleApiError(err as AxiosError);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -227,27 +227,32 @@ export default function BugDetailsPage() {
     return user?.name || 'Unknown User';
   };
 
-  const getStatusVariant = (status: BugStatus): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusVariant = (status: BugStatus) => {
     switch (status) {
-      case BugStatus.OPEN: return "destructive";
-      case BugStatus.IN_PROGRESS: return "default";
-      case BugStatus.RESOLVED: return "secondary";
-      case BugStatus.CLOSED: return "outline";
-      default: return "outline";
+      case BugStatus.OPEN: return "status-open" as const;
+      case BugStatus.IN_PROGRESS: return "status-in-progress" as const;
+      case BugStatus.RESOLVED: return "status-resolved" as const;
+      case BugStatus.CLOSED: return "status-closed" as const;
+      default: return "status-open" as const;
     }
   };
 
-  const getPriorityVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
+  const getPriorityVariant = (priority: BugPriority) => {
     switch (priority) {
-      case BugPriority.CRITICAL:
-      case BugPriority.HIGH:
-        return "destructive";
-      case BugPriority.MEDIUM:
-        return "default";
-      case BugPriority.LOW:
-        return "secondary";
-      default:
-        return "outline";
+      case BugPriority.LOW: return "priority-low" as const;
+      case BugPriority.MEDIUM: return "priority-medium" as const;
+      case BugPriority.HIGH: return "priority-high" as const;
+      case BugPriority.CRITICAL: return "priority-critical" as const;
+      default: return "priority-medium" as const;
+    }
+  };
+
+  const getSeverityVariant = (severity: BugSeverity) => {
+    switch (severity) {
+      case BugSeverity.MINOR: return "severity-minor" as const;
+      case BugSeverity.MAJOR: return "severity-major" as const;
+      case BugSeverity.BLOCKER: return "severity-blocker" as const;
+      default: return "severity-minor" as const;
     }
   };
 
@@ -286,13 +291,25 @@ export default function BugDetailsPage() {
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-2xl">{bug.title}</CardTitle>
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant={getStatusVariant(bug.status)}>{bug.status}</Badge>
-                  <Badge variant={getPriorityVariant(bug.priority)}>{bug.priority}</Badge>
-                  <Badge variant="outline">{bug.severity}</Badge>
+                <CardTitle className="text-2xl mb-4">{bug.title}</CardTitle>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Status:</span>
+                    <Badge variant={getStatusVariant(bug.status)}>{bug.status || 'N/A'}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Priority:</span>
+                    <Badge variant={getPriorityVariant(bug.priority)}>{bug.priority || 'N/A'}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Severity:</span>
+                    <Badge variant={getSeverityVariant(bug.severity)}>{bug.severity || 'N/A'}</Badge>
+                  </div>
                   {bug.validated && (
-                    <Badge variant="secondary">✓ Validated</Badge>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground font-medium">Validation:</span>
+                      <Badge variant="secondary">✓ Validated</Badge>
+                    </div>
                   )}
                 </div>
               </div>

@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bug, BugStatus, BugPriority, UserRole } from "@/utils/types";
+import { Bug, BugStatus, BugPriority } from "@/utils/types";
 import { getInitials } from "@/lib/utils";
 import { useUser, usePermission } from "@/contexts/UserContext";
 
@@ -83,7 +83,6 @@ export const BugCard: React.FC<BugCardProps> = ({
 }) => {
   const { currentUser } = useUser();
   const canUpdateStatus = usePermission('canUpdateStatus');
-  const canValidateBug = usePermission('canValidateBug');
   const canCloseBug = usePermission('canCloseBug');
 
   const handleStatusChange = (newStatus: BugStatus) => {

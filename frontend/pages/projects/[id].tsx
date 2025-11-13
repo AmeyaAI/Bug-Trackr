@@ -20,9 +20,8 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { bugApi, projectApi, userApi, commentApi } from '@/utils/apiClient';
-import { Bug, BugStatus, BugPriority, Project, User } from '@/utils/types';
+import { Bug, BugStatus, BugPriority, Project, User, UserRole } from '@/utils/types';
 import { useUser } from '@/contexts/UserContext';
 
 export default function ProjectBugsPage() {
@@ -72,7 +71,7 @@ export default function ProjectBugsPage() {
           try {
             const comments = await commentApi.getByBugId(bug._id);
             counts[bug._id] = comments.length;
-          } catch (err) {
+          } catch {
             counts[bug._id] = 0;
           }
         })
@@ -96,7 +95,7 @@ export default function ProjectBugsPage() {
       await bugApi.updateStatus(bugId, {
         status: newStatus,
         userId: currentUser._id,
-        userRole: currentUser.role as any,
+        userRole: currentUser.role as UserRole,
       });
       
       // Reload bugs to reflect changes
