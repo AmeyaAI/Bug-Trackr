@@ -11,6 +11,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PriorityIcon } from '@/components/PriorityIcon';
 import {
   Select,
   SelectContent,
@@ -90,13 +91,15 @@ export default function BugsPage() {
   // Get badge variant for priority
   const getPriorityBadgeVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
     switch (priority) {
-      case BugPriority.CRITICAL:
+      case BugPriority.HIGHEST:
         return "destructive";
       case BugPriority.HIGH:
         return "destructive";
       case BugPriority.MEDIUM:
         return "default";
       case BugPriority.LOW:
+        return "default";
+      case BugPriority.LOWEST:
         return "secondary";
       default:
         return "outline";
@@ -214,10 +217,36 @@ export default function BugsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value={BugPriority.CRITICAL}>{BugPriority.CRITICAL}</SelectItem>
-              <SelectItem value={BugPriority.HIGH}>{BugPriority.HIGH}</SelectItem>
-              <SelectItem value={BugPriority.MEDIUM}>{BugPriority.MEDIUM}</SelectItem>
-              <SelectItem value={BugPriority.LOW}>{BugPriority.LOW}</SelectItem>
+              <SelectItem value={BugPriority.HIGHEST}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.HIGHEST} />
+                  {BugPriority.HIGHEST}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.HIGH}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.HIGH} />
+                  {BugPriority.HIGH}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.MEDIUM}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.MEDIUM} />
+                  {BugPriority.MEDIUM}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.LOW}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.LOW} />
+                  {BugPriority.LOW}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.LOWEST}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.LOWEST} />
+                  {BugPriority.LOWEST}
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -263,7 +292,8 @@ export default function BugsPage() {
                         <span className="text-sm text-muted-foreground">{getProjectName(bug.projectId)}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <Badge variant={getPriorityBadgeVariant(bug.priority)}>
+                        <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1 w-fit">
+                          <PriorityIcon priority={bug.priority} />
                           {bug.priority}
                         </Badge>
                       </td>

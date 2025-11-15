@@ -12,10 +12,11 @@ export enum BugStatus {
 }
 
 export enum BugPriority {
+  LOWEST = "Lowest",
   LOW = "Low",
   MEDIUM = "Medium",
   HIGH = "High",
-  CRITICAL = "Critical",
+  HIGHEST = "Highest",
 }
 
 export enum BugSeverity {
@@ -74,8 +75,14 @@ export interface User {
 export interface ActivityLog {
   _id: string;
   bugId: string;
+  bugTitle: string;
+  projectId: string;
+  projectName: string;
   action: string;
   performedBy: string;
+  performedByName: string;
+  assignedToName?: string;  // For "assigned" action - name of user who was assigned
+  newStatus?: string;  // For "status_changed" action - the new status value
   timestamp: string;
 }
 

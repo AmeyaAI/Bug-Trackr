@@ -44,12 +44,18 @@ class ActivityLogRepository:
         data = {
             "type": self._entity_type,
             "bugId": activity_log.bugId,
+            "bugTitle": activity_log.bugTitle,
+            "projectId": activity_log.projectId,
+            "projectName": activity_log.projectName,
             "action": activity_log.action,
-            "performedBy": activity_log.performedBy
+            "performedBy": activity_log.performedBy,
+            "performedByName": activity_log.performedByName,
+            "assignedToName": activity_log.assignedToName,
+            "newStatus": activity_log.newStatus
         }
         
         return {
-            "name": f"{activity_log.action} on bug {activity_log.bugId}",  # Display identifier
+            "name": f"{activity_log.performedByName} {activity_log.action}",  # Display identifier
             "description": json.dumps(data),  # All log data as JSON
             "created_at": activity_log.timestamp.isoformat()
         }
@@ -92,8 +98,14 @@ class ActivityLogRepository:
         
         # Extract fields from JSON data
         bug_id = data.get("bugId", "")
+        bug_title = data.get("bugTitle", "")
+        project_id = data.get("projectId", "")
+        project_name = data.get("projectName", "")
         action = data.get("action", "")
         performed_by = data.get("performedBy", "")
+        performed_by_name = data.get("performedByName", "")
+        assigned_to_name = data.get("assignedToName")
+        new_status = data.get("newStatus")
         
         # Parse created_at (timestamp) with robust type checking
         timestamp = item.get("created_at")
@@ -117,8 +129,14 @@ class ActivityLogRepository:
         return ActivityLog(
             _id=log_id,
             bugId=bug_id,
+            bugTitle=bug_title,
+            projectId=project_id,
+            projectName=project_name,
             action=action,
             performedBy=performed_by,
+            performedByName=performed_by_name,
+            assignedToName=assigned_to_name,
+            newStatus=new_status,
             timestamp=timestamp
         )
 
@@ -195,4 +213,53 @@ class ActivityLogRepository:
         logs.sort(key=lambda l: l.timestamp, reverse=True)
         
         logger.info(f"Retrieved {len(logs)} activity logs for bug {bug_id}")
+        return logs
+
+    async def get_all(self) -> List[ActivityLog]:
+        """Retrieve all activity logs.
+        
+        Sorts by timestamp (descending).
+        
+        Returns:
+            List of ActivityLog models sorted by timestamp (newest first)
+        """
+        logger.info("Retrieving all activity logs")
+        
+        # Fetch all items from collection
+        items = await self._service.get_all_items(self._collection)
+        
+        # Filter items in-memory (since data is in JSON description field)
+        filtered_items = []
+        for item in items:
+            description = item.get("description", "")
+            
+            # Skip empty descriptions
+            if not description:
+                continue
+            
+            # Parse JSON and check type
+            try:
+                data = json.loads(description)
+                
+                # Only process items with matching type
+                if data.get("type") == self._entity_type:
+                    try:
+                        filtered_items.append(item)
+                    except ValueError as e:
+                        # Skip malformed activity log data but log the error
+                        logger.warning(f"Skipping malformed activity log data: {e}")
+                        continue
+                        
+            except json.JSONDecodeError as e:
+                # Log parsing failures
+                logger.warning(f"Failed to parse description as JSON: {e}")
+                continue
+        
+        # Transform to ActivityLog models
+        logs = [self._collection_item_to_activity_log(item) for item in filtered_items]
+        
+        # Sort by timestamp (newest first)
+        logs.sort(key=lambda l: l.timestamp, reverse=True)
+        
+        logger.info(f"Retrieved {len(logs)} activity logs")
         return logs

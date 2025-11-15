@@ -10,7 +10,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
-import { BugCard } from '@/components/BugCard';
+import { Badge } from '@/components/ui/badge';
+import { PriorityIcon } from '@/components/PriorityIcon';
+import { SeverityIcon } from '@/components/SeverityIcon';
 import {
   Select,
   SelectContent,
@@ -127,6 +129,60 @@ export default function ProjectBugsPage() {
     return user?.name || 'Unknown User';
   };
 
+  // Get badge variant for priority
+  const getPriorityBadgeVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
+    switch (priority) {
+      case BugPriority.HIGHEST:
+        return "destructive";
+      case BugPriority.HIGH:
+        return "destructive";
+      case BugPriority.MEDIUM:
+        return "default";
+      case BugPriority.LOW:
+        return "default";
+      case BugPriority.LOWEST:
+        return "secondary";
+      default:
+        return "outline";
+    }
+  };
+
+  // Get badge variant for status
+  const getStatusBadgeVariant = (status: BugStatus): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case BugStatus.OPEN:
+        return "destructive";
+      case BugStatus.IN_PROGRESS:
+        return "default";
+      case BugStatus.RESOLVED:
+        return "secondary";
+      case BugStatus.CLOSED:
+        return "outline";
+      default:
+        return "outline";
+    }
+  };
+
+  // Format relative time
+  const formatRelativeTime = (date: string): string => {
+    const now = new Date();
+    const bugDate = new Date(date);
+    const diffMs = now.getTime() - bugDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) {
+      return diffMins <= 1 ? '1 minute ago' : `${diffMins} minutes ago`;
+    } else if (diffHours < 24) {
+      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    } else if (diffDays < 30) {
+      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    } else {
+      return bugDate.toLocaleDateString();
+    }
+  };
+
   // Filter bugs based on selected filters
   const filteredBugs = bugs.filter(bug => {
     const matchesStatus = statusFilter === 'all' || bug.status === statusFilter;
@@ -145,9 +201,9 @@ export default function ProjectBugsPage() {
     const inProgress = bugs.filter(b => b.status === BugStatus.IN_PROGRESS).length;
     const resolved = bugs.filter(b => b.status === BugStatus.RESOLVED).length;
     const closed = bugs.filter(b => b.status === BugStatus.CLOSED).length;
-    const critical = bugs.filter(b => b.priority === BugPriority.CRITICAL).length;
+    const highest = bugs.filter(b => b.priority === BugPriority.HIGHEST).length;
     
-    return { total, open, inProgress, resolved, closed, critical };
+    return { total, open, inProgress, resolved, closed, highest };
   };
 
   if (isLoading) {
@@ -232,8 +288,8 @@ export default function ProjectBugsPage() {
                 <p className="text-2xl font-bold text-green-600">{stats.closed}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Critical</p>
-                <p className="text-2xl font-bold text-red-600">{stats.critical}</p>
+                <p className="text-sm text-muted-foreground">Highest</p>
+                <p className="text-2xl font-bold text-red-600">{stats.highest}</p>
               </div>
             </div>
           </CardContent>
@@ -267,10 +323,36 @@ export default function ProjectBugsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value={BugPriority.CRITICAL}>{BugPriority.CRITICAL}</SelectItem>
-              <SelectItem value={BugPriority.HIGH}>{BugPriority.HIGH}</SelectItem>
-              <SelectItem value={BugPriority.MEDIUM}>{BugPriority.MEDIUM}</SelectItem>
-              <SelectItem value={BugPriority.LOW}>{BugPriority.LOW}</SelectItem>
+              <SelectItem value={BugPriority.HIGHEST}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.HIGHEST} />
+                  {BugPriority.HIGHEST}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.HIGH}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.HIGH} />
+                  {BugPriority.HIGH}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.MEDIUM}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.MEDIUM} />
+                  {BugPriority.MEDIUM}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.LOW}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.LOW} />
+                  {BugPriority.LOW}
+                </div>
+              </SelectItem>
+              <SelectItem value={BugPriority.LOWEST}>
+                <div className="flex items-center gap-2">
+                  <PriorityIcon priority={BugPriority.LOWEST} />
+                  {BugPriority.LOWEST}
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -291,17 +373,87 @@ export default function ProjectBugsPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredBugs.map((bug) => (
-              <BugCard
-                key={bug._id}
-                bug={bug}
-                commentCount={commentCounts[bug._id] || 0}
-                assignedUserName={bug.assignedTo ? getUserName(bug.assignedTo) : undefined}
-                onStatusUpdate={handleStatusUpdate}
-                onViewDetails={handleViewDetails}
-              />
-            ))}
+          <div className="bg-card rounded-lg border">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Title</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Priority</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Severity</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Assignee</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Comments</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBugs.map((bug) => (
+                    <tr 
+                      key={bug._id} 
+                      className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => handleViewDetails(bug._id)}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-foreground max-w-md truncate">{bug.title}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1 w-fit">
+                          <PriorityIcon priority={bug.priority} />
+                          {bug.priority}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge variant={getStatusBadgeVariant(bug.status)}>
+                          {bug.status}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <SeverityIcon severity={bug.severity} />
+                          <span className="text-sm text-muted-foreground">{bug.severity}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {bug.assignedTo ? (
+                            <>
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                                {getUserName(bug.assignedTo).charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-sm truncate max-w-[120px]">{getUserName(bug.assignedTo)}</span>
+                            </>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Unassigned</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <span>{commentCounts[bug._id] || 0}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
+                        {formatRelativeTime(bug.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

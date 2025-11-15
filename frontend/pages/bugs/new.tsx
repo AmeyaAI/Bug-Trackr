@@ -31,6 +31,8 @@ import {
 import { bugApi, projectApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
 import { BugPriority, BugSeverity, Project } from "@/utils/types";
 import { useUser } from "@/contexts/UserContext";
+import { PriorityIcon } from "@/components/PriorityIcon";
+import { SeverityIcon } from "@/components/SeverityIcon";
 import { useToast } from "@/contexts/ToastContext";
 import { AxiosError } from "axios";
 
@@ -275,17 +277,35 @@ export default function NewBugPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={BugPriority.LOWEST}>
+                        <div className="flex items-center gap-2">
+                          <PriorityIcon priority={BugPriority.LOWEST} />
+                          {BugPriority.LOWEST}
+                        </div>
+                      </SelectItem>
                       <SelectItem value={BugPriority.LOW}>
-                        {BugPriority.LOW}
+                        <div className="flex items-center gap-2">
+                          <PriorityIcon priority={BugPriority.LOW} />
+                          {BugPriority.LOW}
+                        </div>
                       </SelectItem>
                       <SelectItem value={BugPriority.MEDIUM}>
-                        {BugPriority.MEDIUM}
+                        <div className="flex items-center gap-2">
+                          <PriorityIcon priority={BugPriority.MEDIUM} />
+                          {BugPriority.MEDIUM}
+                        </div>
                       </SelectItem>
                       <SelectItem value={BugPriority.HIGH}>
-                        {BugPriority.HIGH}
+                        <div className="flex items-center gap-2">
+                          <PriorityIcon priority={BugPriority.HIGH} />
+                          {BugPriority.HIGH}
+                        </div>
                       </SelectItem>
-                      <SelectItem value={BugPriority.CRITICAL}>
-                        {BugPriority.CRITICAL}
+                      <SelectItem value={BugPriority.HIGHEST}>
+                        <div className="flex items-center gap-2">
+                          <PriorityIcon priority={BugPriority.HIGHEST} />
+                          {BugPriority.HIGHEST}
+                        </div>
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -307,13 +327,22 @@ export default function NewBugPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={BugSeverity.MINOR}>
-                        {BugSeverity.MINOR}
+                        <div className="flex items-center gap-2">
+                          <SeverityIcon severity={BugSeverity.MINOR} />
+                          {BugSeverity.MINOR}
+                        </div>
                       </SelectItem>
                       <SelectItem value={BugSeverity.MAJOR}>
-                        {BugSeverity.MAJOR}
+                        <div className="flex items-center gap-2">
+                          <SeverityIcon severity={BugSeverity.MAJOR} />
+                          {BugSeverity.MAJOR}
+                        </div>
                       </SelectItem>
                       <SelectItem value={BugSeverity.BLOCKER}>
-                        {BugSeverity.BLOCKER}
+                        <div className="flex items-center gap-2">
+                          <SeverityIcon severity={BugSeverity.BLOCKER} />
+                          {BugSeverity.BLOCKER}
+                        </div>
                       </SelectItem>
                     </SelectContent>
                   </Select>

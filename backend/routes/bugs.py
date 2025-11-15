@@ -147,6 +147,24 @@ async def create_bug(
         # Create bug using repository
         created_bug = await services.bug_repository.create(bug)
         
+        # Get user and project names for activity log
+        reporter = await services.user_repository.get_by_id(reportedBy)
+        reporter_name = reporter.name if reporter else "Unknown User"
+        
+        # Log activity: Bug reported
+        from backend.models.bug_model import ActivityLog
+        activity_log = ActivityLog(
+            bugId=created_bug.id,
+            bugTitle=created_bug.title,
+            projectId=projectId,
+            projectName=project.name,
+            action="reported",
+            performedBy=reportedBy,
+            performedByName=reporter_name,
+            timestamp=datetime.now(timezone.utc)
+        )
+        await services.activity_log_repository.create(activity_log)
+        
         logger.info(f"Bug created: {created_bug.id} for project {projectId}")
         
         # Return response
@@ -296,12 +314,24 @@ async def update_bug_status(
             updated_at=datetime.now(timezone.utc)
         )
         
+        # Get user and project names for activity log
+        user = await services.user_repository.get_by_id(status_update.userId)
+        user_name = user.name if user else "Unknown User"
+        
+        project = await services.project_repository.get_by_id(bug.projectId)
+        project_name = project.name if project else "Unknown Project"
+        
         # Log activity to Collection DB
         from backend.models.bug_model import ActivityLog
         activity_log = ActivityLog(
             bugId=bug_id,
+            bugTitle=bug.title,
+            projectId=bug.projectId,
+            projectName=project_name,
             action="status_changed",
             performedBy=status_update.userId,
+            performedByName=user_name,
+            newStatus=status_update.status.value,  # Store the new status value
             timestamp=datetime.now(timezone.utc)
         )
         await services.activity_log_repository.create(activity_log)
@@ -364,12 +394,23 @@ async def validate_bug(
             updated_at=datetime.now(timezone.utc)
         )
         
+        # Get user and project names for activity log
+        user = await services.user_repository.get_by_id(userId)
+        user_name = user.name if user else "Unknown User"
+        
+        project = await services.project_repository.get_by_id(bug.projectId)
+        project_name = project.name if project else "Unknown Project"
+        
         # Log activity to Collection DB
         from backend.models.bug_model import ActivityLog
         activity_log = ActivityLog(
             bugId=bug_id,
-            action="bug_validated",
+            bugTitle=bug.title,
+            projectId=bug.projectId,
+            projectName=project_name,
+            action="validated",
             performedBy=userId,
+            performedByName=user_name,
             timestamp=datetime.now(timezone.utc)
         )
         await services.activity_log_repository.create(activity_log)
@@ -436,12 +477,28 @@ async def assign_bug(
             updated_at=datetime.now(timezone.utc)
         )
         
+        # Get user and project names for activity log
+        user = await services.user_repository.get_by_id(assignment.assignedBy)
+        user_name = user.name if user else "Unknown User"
+        
+        project = await services.project_repository.get_by_id(bug.projectId)
+        project_name = project.name if project else "Unknown Project"
+        
+        # Get the name of the user who was assigned to the bug
+        assigned_user = await services.user_repository.get_by_id(assignment.assignedTo)
+        assigned_user_name = assigned_user.name if assigned_user else "Unknown User"
+        
         # Log activity to Collection DB
         from backend.models.bug_model import ActivityLog
         activity_log = ActivityLog(
             bugId=bug_id,
-            action="bug_assigned",
+            bugTitle=bug.title,
+            projectId=bug.projectId,
+            projectName=project_name,
+            action="assigned",
             performedBy=assignment.assignedBy,
+            performedByName=user_name,
+            assignedToName=assigned_user_name,  # Store who was assigned
             timestamp=datetime.now(timezone.utc)
         )
         await services.activity_log_repository.create(activity_log)

@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { PriorityIcon } from '@/components/PriorityIcon';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/contexts/UserContext';
@@ -15,7 +16,7 @@ interface BugStatistics {
   inProgress: number;
   resolved: number;
   closed: number;
-  critical: number;
+  highest: number;
   high: number;
 }
 
@@ -30,7 +31,7 @@ export default function Home() {
     inProgress: 0,
     resolved: 0,
     closed: 0,
-    critical: 0,
+    highest: 0,
     high: 0,
   });
   const [showWelcome, setShowWelcome] = useState(false);
@@ -68,7 +69,7 @@ export default function Home() {
           inProgress: bugsData.filter(b => b.status === BugStatus.IN_PROGRESS).length,
           resolved: bugsData.filter(b => b.status === BugStatus.RESOLVED).length,
           closed: bugsData.filter(b => b.status === BugStatus.CLOSED).length,
-          critical: bugsData.filter(b => b.priority === BugPriority.CRITICAL).length,
+          highest: bugsData.filter(b => b.priority === BugPriority.HIGHEST).length,
           high: bugsData.filter(b => b.priority === BugPriority.HIGH).length,
         };
         setStatistics(stats);
@@ -99,13 +100,15 @@ export default function Home() {
 
   const getPriorityBadgeVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
     switch (priority) {
-      case BugPriority.CRITICAL:
+      case BugPriority.HIGHEST:
         return "destructive";
       case BugPriority.HIGH:
         return "destructive";
       case BugPriority.MEDIUM:
         return "default";
       case BugPriority.LOW:
+        return "default";
+      case BugPriority.LOWEST:
         return "secondary";
       default:
         return "outline";
@@ -171,7 +174,7 @@ export default function Home() {
               <CardContent>
                 <div className="text-2xl font-bold">{statistics.open}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {statistics.critical} critical, {statistics.high} high priority
+                  {statistics.highest} highest, {statistics.high} high priority
                 </p>
               </CardContent>
             </Card>
@@ -228,7 +231,8 @@ export default function Home() {
                           <Badge variant={getStatusBadgeVariant(bug.status)}>
                             {bug.status}
                           </Badge>
-                          <Badge variant={getPriorityBadgeVariant(bug.priority)}>
+                          <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1">
+                            <PriorityIcon priority={bug.priority} />
                             {bug.priority}
                           </Badge>
                         </div>

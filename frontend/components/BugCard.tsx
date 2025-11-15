@@ -23,6 +23,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bug, BugStatus, BugPriority } from "@/utils/types";
 import { getInitials } from "@/lib/utils";
 import { useUser, usePermission } from "@/contexts/UserContext";
+import { PriorityIcon } from "@/components/PriorityIcon";
+import { SeverityIcon } from "@/components/SeverityIcon";
 
 interface BugCardProps {
   bug: Bug;
@@ -59,13 +61,15 @@ const getPriorityVariant = (
   priority: BugPriority
 ): "default" | "secondary" | "destructive" | "outline" => {
   switch (priority) {
-    case BugPriority.CRITICAL:
+    case BugPriority.HIGHEST:
       return "destructive";
     case BugPriority.HIGH:
       return "destructive";
     case BugPriority.MEDIUM:
       return "default";
     case BugPriority.LOW:
+      return "default";
+    case BugPriority.LOWEST:
       return "secondary";
     default:
       return "outline";
@@ -98,34 +102,42 @@ export const BugCard: React.FC<BugCardProps> = ({
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg truncate">{bug.title}</CardTitle>
-            <CardDescription className="mt-2 line-clamp-2">
+    <Card className="hover:shadow-md transition-shadow overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <CardTitle className="text-lg break-words line-clamp-2 leading-tight mb-2">
+              {bug.title}
+            </CardTitle>
+            <CardDescription className="line-clamp-2 break-words">
               {bug.description}
             </CardDescription>
           </div>
-          <div className="flex flex-col gap-2 items-end">
-            <Badge variant={getStatusVariant(bug.status)}>{bug.status}</Badge>
-            <Badge variant={getPriorityVariant(bug.priority)}>
+          <div className="flex flex-col gap-2 items-end flex-shrink-0">
+            <Badge variant={getStatusVariant(bug.status)} className="whitespace-nowrap">
+              {bug.status}
+            </Badge>
+            <Badge variant={getPriorityVariant(bug.priority)} className="whitespace-nowrap flex items-center gap-1">
+              <PriorityIcon priority={bug.priority} />
               {bug.priority}
             </Badge>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+      <CardContent className="pb-3">
+        <div className="flex items-center flex-wrap gap-3 text-sm text-muted-foreground">
           {/* Severity indicator */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className="font-medium">Severity:</span>
-            <span>{bug.severity}</span>
+            <div className="flex items-center gap-1">
+              <SeverityIcon severity={bug.severity} />
+              <span>{bug.severity}</span>
+            </div>
           </div>
 
           {/* Comment count */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -144,7 +156,7 @@ export const BugCard: React.FC<BugCardProps> = ({
 
           {/* Validated indicator */}
           {bug.validated && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs flex-shrink-0">
               ✓ Validated
             </Badge>
           )}
@@ -152,20 +164,20 @@ export const BugCard: React.FC<BugCardProps> = ({
 
         {/* Assignment info */}
         {bug.assignedTo && (
-          <div className="flex items-center gap-2 mt-4">
-            <Avatar className="size-6">
+          <div className="flex items-center gap-2 mt-3 min-w-0">
+            <Avatar className="size-6 flex-shrink-0">
               <AvatarFallback className="text-xs">
                 {assignedUserName ? getInitials(assignedUserName) : "U"}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground truncate">
               Assigned to {assignedUserName || "User"}
             </span>
           </div>
         )}
       </CardContent>
 
-      <CardFooter className="gap-2">
+      <CardFooter className="gap-2 flex-wrap pt-3">
         {/* Role-based quick action buttons */}
         {currentUser && (
           <>
@@ -175,6 +187,7 @@ export const BugCard: React.FC<BugCardProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={() => handleStatusChange(BugStatus.IN_PROGRESS)}
+                className="flex-shrink-0"
               >
                 Start Progress
               </Button>
@@ -185,6 +198,7 @@ export const BugCard: React.FC<BugCardProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={() => handleStatusChange(BugStatus.RESOLVED)}
+                className="flex-shrink-0"
               >
                 Mark Resolved
               </Button>
@@ -196,6 +210,7 @@ export const BugCard: React.FC<BugCardProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={() => handleStatusChange(BugStatus.CLOSED)}
+                className="flex-shrink-0"
               >
                 Close Bug
               </Button>
@@ -207,7 +222,7 @@ export const BugCard: React.FC<BugCardProps> = ({
           size="sm"
           variant="ghost"
           onClick={handleViewDetails}
-          className="ml-auto"
+          className="ml-auto flex-shrink-0"
         >
           View Details
         </Button>

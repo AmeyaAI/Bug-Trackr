@@ -9,6 +9,7 @@ import type {
   Comment,
   Project,
   User,
+  ActivityLog,
   BugCreateRequest,
   BugStatusUpdateRequest,
   BugAssignRequest,
@@ -100,7 +101,7 @@ apiClient.interceptors.response.use(
 /**
  * API Error Response structure
  */
-interface ApiErrorResponse {
+export interface ApiErrorResponse {
   detail?: string | ValidationError[];
 }
 
@@ -310,6 +311,25 @@ export const userApi = {
   getById: async (id: string): Promise<User> => {
     const response = await apiClient.get<User>(`/api/users/${id}`);
     return transformDates(response.data);
+  },
+};
+
+// Activity Log API endpoints
+export const activityLogApi = {
+  /**
+   * Get all activity logs
+   */
+  getAll: async (): Promise<ActivityLog[]> => {
+    const response = await apiClient.get<ActivityLog[]>('/api/activity-logs');
+    return response.data.map(transformDates);
+  },
+
+  /**
+   * Get activity logs for a specific bug
+   */
+  getByBugId: async (bugId: string): Promise<ActivityLog[]> => {
+    const response = await apiClient.get<ActivityLog[]>(`/api/activity-logs/bug/${bugId}`);
+    return response.data.map(transformDates);
   },
 };
 

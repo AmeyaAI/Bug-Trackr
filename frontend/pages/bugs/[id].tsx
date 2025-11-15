@@ -11,6 +11,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PriorityIcon } from '@/components/PriorityIcon';
+import { SeverityIcon } from '@/components/SeverityIcon';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
   Select,
@@ -239,10 +241,11 @@ export default function BugDetailsPage() {
 
   const getPriorityVariant = (priority: BugPriority) => {
     switch (priority) {
+      case BugPriority.LOWEST: return "priority-low" as const;
       case BugPriority.LOW: return "priority-low" as const;
       case BugPriority.MEDIUM: return "priority-medium" as const;
       case BugPriority.HIGH: return "priority-high" as const;
-      case BugPriority.CRITICAL: return "priority-critical" as const;
+      case BugPriority.HIGHEST: return "priority-critical" as const;
       default: return "priority-medium" as const;
     }
   };
@@ -299,11 +302,17 @@ export default function BugDetailsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground font-medium">Priority:</span>
-                    <Badge variant={getPriorityVariant(bug.priority)}>{bug.priority || 'N/A'}</Badge>
+                    <Badge variant={getPriorityVariant(bug.priority)} className="flex items-center gap-1">
+                      <PriorityIcon priority={bug.priority} />
+                      {bug.priority || 'N/A'}
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground font-medium">Severity:</span>
-                    <Badge variant={getSeverityVariant(bug.severity)}>{bug.severity || 'N/A'}</Badge>
+                    <Badge variant={getSeverityVariant(bug.severity)} className="flex items-center gap-1">
+                      <SeverityIcon severity={bug.severity} />
+                      {bug.severity || 'N/A'}
+                    </Badge>
                   </div>
                   {bug.validated && (
                     <div className="flex items-center gap-2">

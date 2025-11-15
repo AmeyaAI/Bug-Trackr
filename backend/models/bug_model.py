@@ -38,10 +38,11 @@ class BugStatus(str, Enum):
 
 class BugPriority(str, Enum):
     """Valid bug priority levels"""
+    LOWEST = "Lowest"
     LOW = "Low"
     MEDIUM = "Medium"
     HIGH = "High"
-    CRITICAL = "Critical"
+    HIGHEST = "Highest"
 
 
 class BugSeverity(str, Enum):
@@ -146,8 +147,15 @@ class ActivityLog(BaseModel):
     """
     id: Optional[str] = Field(None, alias="_id")
     bugId: str = Field(..., min_length=1)
-    action: str = Field(..., min_length=1)
-    performedBy: str = Field(..., min_length=1)
+    bugTitle: str = Field(default="")
+    projectId: str = Field(default="")
+    projectName: str = Field(default="")
+    action: str = Field(..., min_length=1)  # "reported", "assigned", "status_changed"
+    performedBy: str = Field(..., min_length=1)  # User ID
+    performedByName: str = Field(default="")  # User name for display
+    # Additional context fields
+    assignedToName: Optional[str] = Field(default=None)  # For "assigned" action - name of user who was assigned
+    newStatus: Optional[str] = Field(default=None)  # For "status_changed" action - the new status value
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Config:

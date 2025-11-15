@@ -3,7 +3,7 @@ import type { AppProps } from "next/app";
 import { UserProvider } from "@/contexts/UserContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { NavbarProvider } from "@/contexts/NavbarContext";
-import { Layout } from "@/components/Layout";
+import { AppSidebar } from "@/components/AppSidebar";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -13,9 +13,9 @@ export default function App({ Component, pageProps }: AppProps) {
       <ToastProvider>
         <UserProvider>
           <NavbarProvider>
-            <Layout>
+            <AppSidebar>
               <Component {...pageProps} />
-            </Layout>
+            </AppSidebar>
             <ToastContainer />
           </NavbarProvider>
         </UserProvider>
