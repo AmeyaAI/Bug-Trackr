@@ -31,12 +31,15 @@ import {
 } from '@/components/ui/dialog';
 import { CommentSection } from '@/components/CommentSection';
 import { bugApi, projectApi, userApi, commentApi, handleApiError, ApiErrorResponse } from '@/utils/apiClient';
-import { Bug, Comment, BugStatus, BugPriority, BugSeverity, Project, User, UserRole, getRolePermissions } from '@/utils/types';
+import { Bug, Comment, BugStatus, Project, User, UserRole, getRolePermissions } from '@/utils/types';
+import { getUserName as getNameFromUsers, getStatusBadgeVariant, getPriorityBadgeVariant, getSeverityBadgeVariant } from '@/utils/badgeHelpers';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/contexts/ToastContext';
 import { LoadingState } from '@/components/LoadingState';
 import { handleEventualConsistency } from '@/utils/apiHelpers';
 import { AxiosError } from 'axios';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function BugDetailsPage() {
   const router = useRouter();
@@ -224,39 +227,9 @@ export default function BugDetailsPage() {
     }
   };
 
+  // Wrapper function to maintain compatibility
   const getUserName = (userId: string): string => {
-    const user = users.find(u => u._id === userId);
-    return user?.name || 'Unknown User';
-  };
-
-  const getStatusVariant = (status: BugStatus) => {
-    switch (status) {
-      case BugStatus.OPEN: return "status-open" as const;
-      case BugStatus.IN_PROGRESS: return "status-in-progress" as const;
-      case BugStatus.RESOLVED: return "status-resolved" as const;
-      case BugStatus.CLOSED: return "status-closed" as const;
-      default: return "status-open" as const;
-    }
-  };
-
-  const getPriorityVariant = (priority: BugPriority) => {
-    switch (priority) {
-      case BugPriority.LOWEST: return "priority-low" as const;
-      case BugPriority.LOW: return "priority-low" as const;
-      case BugPriority.MEDIUM: return "priority-medium" as const;
-      case BugPriority.HIGH: return "priority-high" as const;
-      case BugPriority.HIGHEST: return "priority-critical" as const;
-      default: return "priority-medium" as const;
-    }
-  };
-
-  const getSeverityVariant = (severity: BugSeverity) => {
-    switch (severity) {
-      case BugSeverity.MINOR: return "severity-minor" as const;
-      case BugSeverity.MAJOR: return "severity-major" as const;
-      case BugSeverity.BLOCKER: return "severity-blocker" as const;
-      default: return "severity-minor" as const;
-    }
+    return getNameFromUsers(userId, users);
   };
 
   // Get role permissions
@@ -295,29 +268,33 @@ export default function BugDetailsPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <CardTitle className="text-2xl mb-4">{bug.title}</CardTitle>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Status:</span>
-                    <Badge variant={getStatusVariant(bug.status)}>{bug.status || 'N/A'}</Badge>
+                    <span className="text-muted-foreground font-medium text-sm">Status:</span>
+                    <Badge variant={getStatusBadgeVariant(bug.status)} className="text-sm px-2.5 py-1">
+                      {bug.status || 'N/A'}
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Priority:</span>
-                    <Badge variant={getPriorityVariant(bug.priority)} className="flex items-center gap-1">
+                    <span className="text-muted-foreground font-medium text-sm">Priority:</span>
+                    <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1.5 text-sm px-2.5 py-1">
                       <PriorityIcon priority={bug.priority} />
                       {bug.priority || 'N/A'}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Severity:</span>
-                    <Badge variant={getSeverityVariant(bug.severity)} className="flex items-center gap-1">
+                    <span className="text-muted-foreground font-medium text-sm">Severity:</span>
+                    <Badge variant={getSeverityBadgeVariant(bug.severity)} className="flex items-center gap-1.5 text-sm px-2.5 py-1">
                       <SeverityIcon severity={bug.severity} />
                       {bug.severity || 'N/A'}
                     </Badge>
                   </div>
                   {bug.validated && (
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground font-medium">Validation:</span>
-                      <Badge variant="secondary">✓ Validated</Badge>
+                      <span className="text-muted-foreground font-medium text-sm">Validation:</span>
+                      <Badge variant="secondary" className="text-sm px-2.5 py-1">
+                        ✓ Validated
+                      </Badge>
                     </div>
                   )}
                 </div>
@@ -329,7 +306,11 @@ export default function BugDetailsPage() {
             {/* Description */}
             <div>
               <h3 className="font-semibold mb-2">Description</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{bug.description}</p>
+              <div className="bg-muted/70 rounded-lg p-4 prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {bug.description}
+                </ReactMarkdown>
+              </div>
             </div>
 
             {/* Metadata grid */}

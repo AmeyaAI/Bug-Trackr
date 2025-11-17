@@ -22,9 +22,10 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { bugApi, projectApi, userApi, commentApi } from '@/utils/apiClient';
-import { Bug, BugStatus, BugPriority, Project, User, UserRole } from '@/utils/types';
+import { bugApi, projectApi, userApi } from '@/utils/apiClient';
+import { Bug, BugStatus, BugPriority, Project, User } from '@/utils/types';
 import { useUser } from '@/contexts/UserContext';
+import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName } from '@/utils/badgeHelpers';
 
 export default function ProjectBugsPage() {
   const router = useRouter();
@@ -71,9 +72,10 @@ export default function ProjectBugsPage() {
       await Promise.all(
         projectBugs.map(async (bug) => {
           try {
-            const comments = await commentApi.getByBugId(bug._id);
-            counts[bug._id] = comments.length;
-          } catch {
+            const bugWithComments = await bugApi.getById(bug._id);
+            counts[bug._id] = bugWithComments.comments.length;
+          } catch (err) {
+            console.error(`Failed to load comments for bug ${bug._id}:`, err);
             counts[bug._id] = 0;
           }
         })
@@ -84,29 +86,6 @@ export default function ProjectBugsPage() {
       setError('Failed to load project data. Please try again.');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleStatusUpdate = async (bugId: string, newStatus: BugStatus) => {
-    if (!currentUser) {
-      alert('Please select a user first');
-      return;
-    }
-
-    try {
-      await bugApi.updateStatus(bugId, {
-        status: newStatus,
-        userId: currentUser._id,
-        userRole: currentUser.role as UserRole,
-      });
-      
-      // Reload bugs to reflect changes
-      if (projectId && typeof projectId === 'string') {
-        await loadData(projectId);
-      }
-    } catch (err) {
-      console.error('Failed to update status:', err);
-      alert('Failed to update bug status');
     }
   };
 
@@ -121,66 +100,6 @@ export default function ProjectBugsPage() {
 
   const handleBackToProjects = () => {
     router.push('/projects');
-  };
-
-  // Get user name by ID
-  const getUserName = (userId: string): string => {
-    const user = users.find(u => u._id === userId);
-    return user?.name || 'Unknown User';
-  };
-
-  // Get badge variant for priority
-  const getPriorityBadgeVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
-    switch (priority) {
-      case BugPriority.HIGHEST:
-        return "destructive";
-      case BugPriority.HIGH:
-        return "destructive";
-      case BugPriority.MEDIUM:
-        return "default";
-      case BugPriority.LOW:
-        return "default";
-      case BugPriority.LOWEST:
-        return "secondary";
-      default:
-        return "outline";
-    }
-  };
-
-  // Get badge variant for status
-  const getStatusBadgeVariant = (status: BugStatus): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case BugStatus.OPEN:
-        return "destructive";
-      case BugStatus.IN_PROGRESS:
-        return "default";
-      case BugStatus.RESOLVED:
-        return "secondary";
-      case BugStatus.CLOSED:
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
-
-  // Format relative time
-  const formatRelativeTime = (date: string): string => {
-    const now = new Date();
-    const bugDate = new Date(date);
-    const diffMs = now.getTime() - bugDate.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) {
-      return diffMins <= 1 ? '1 minute ago' : `${diffMins} minutes ago`;
-    } else if (diffHours < 24) {
-      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-    } else if (diffDays < 30) {
-      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-    } else {
-      return bugDate.toLocaleDateString();
-    }
   };
 
   // Filter bugs based on selected filters
@@ -419,9 +338,9 @@ export default function ProjectBugsPage() {
                           {bug.assignedTo ? (
                             <>
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                {getUserName(bug.assignedTo).charAt(0).toUpperCase()}
+                                {getUserName(bug.assignedTo, users).charAt(0).toUpperCase()}
                               </div>
-                              <span className="text-sm truncate max-w-[120px]">{getUserName(bug.assignedTo)}</span>
+                              <span className="text-sm truncate max-w-[120px]">{getUserName(bug.assignedTo, users)}</span>
                             </>
                           ) : (
                             <span className="text-sm text-muted-foreground">Unassigned</span>

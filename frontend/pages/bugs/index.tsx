@@ -25,6 +25,7 @@ import { Bug, BugStatus, BugPriority, User, Project } from '@/utils/types';
 import { useUser } from '@/contexts/UserContext';
 import { LoadingState } from '@/components/LoadingState';
 import { ApiErrorFallback } from '@/components/ApiErrorFallback';
+import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName, getProjectName } from '@/utils/badgeHelpers';
 
 export default function BugsPage() {
   const router = useRouter();
@@ -74,72 +75,6 @@ export default function BugsPage() {
 
   const handleCreateBug = () => {
     router.push('/bugs/new');
-  };
-
-  // Get user name by ID
-  const getUserName = (userId: string): string => {
-    const user = users.find(u => u._id === userId);
-    return user?.name || 'Unknown User';
-  };
-
-  // Get project name by ID
-  const getProjectName = (projectId: string): string => {
-    const project = projects.find(p => p._id === projectId);
-    return project?.name || 'Unknown Project';
-  };
-
-  // Get badge variant for priority
-  const getPriorityBadgeVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
-    switch (priority) {
-      case BugPriority.HIGHEST:
-        return "destructive";
-      case BugPriority.HIGH:
-        return "destructive";
-      case BugPriority.MEDIUM:
-        return "default";
-      case BugPriority.LOW:
-        return "default";
-      case BugPriority.LOWEST:
-        return "secondary";
-      default:
-        return "outline";
-    }
-  };
-
-  // Get badge variant for status
-  const getStatusBadgeVariant = (status: BugStatus): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case BugStatus.OPEN:
-        return "destructive";
-      case BugStatus.IN_PROGRESS:
-        return "default";
-      case BugStatus.RESOLVED:
-        return "secondary";
-      case BugStatus.CLOSED:
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
-
-  // Format relative time
-  const formatRelativeTime = (date: string): string => {
-    const now = new Date();
-    const bugDate = new Date(date);
-    const diffMs = now.getTime() - bugDate.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) {
-      return diffMins <= 1 ? '1 minute ago' : `${diffMins} minutes ago`;
-    } else if (diffHours < 24) {
-      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-    } else if (diffDays < 30) {
-      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-    } else {
-      return bugDate.toLocaleDateString();
-    }
   };
 
   // Filter bugs based on selected filters
@@ -289,7 +224,7 @@ export default function BugsPage() {
                         <div className="font-medium text-foreground">{bug.title}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-muted-foreground">{getProjectName(bug.projectId)}</span>
+                        <span className="text-sm text-muted-foreground">{getProjectName(bug.projectId, projects)}</span>
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1 w-fit">
@@ -307,9 +242,9 @@ export default function BugsPage() {
                           {bug.assignedTo ? (
                             <>
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                {getUserName(bug.assignedTo).charAt(0).toUpperCase()}
+                                {getUserName(bug.assignedTo, users).charAt(0).toUpperCase()}
                               </div>
-                              <span className="text-sm">{getUserName(bug.assignedTo)}</span>
+                              <span className="text-sm">{getUserName(bug.assignedTo, users)}</span>
                             </>
                           ) : (
                             <span className="text-sm text-muted-foreground">Unassigned</span>

@@ -46,7 +46,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const storedUser = localStorage.getItem('bugtrackr_current_user');
         if (storedUser) {
           try {
-            setCurrentUser(JSON.parse(storedUser));
+            const parsed = JSON.parse(storedUser);
+            // Validate that the stored user has required properties
+            if (parsed && parsed._id && parsed.name) {
+              setCurrentUser(parsed);
+            } else {
+              // Invalid stored user, clear it
+              localStorage.removeItem('bugtrackr_current_user');
+            }
           } catch (error) {
             console.error('Failed to parse stored user:', error);
             localStorage.removeItem('bugtrackr_current_user');

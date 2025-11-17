@@ -9,28 +9,28 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        // Status badges
-        "status-open": "bg-blue-50 text-blue-500 hover:bg-blue-100",
-        "status-in-progress": "bg-amber-50 text-amber-500 hover:bg-amber-100",
-        "status-resolved": "bg-green-50 text-green-500 hover:bg-green-100",
-        "status-closed": "bg-gray-100 text-gray-500 hover:bg-gray-200",
+        // Status badges with dark mode
+        "status-open": "bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900",
+        "status-in-progress": "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-900",
+        "status-resolved": "bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900",
+        "status-closed": "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700",
         
-        // Priority badges
-        "priority-low": "bg-gray-50 text-gray-400 hover:bg-gray-100",
-        "priority-medium": "bg-yellow-50 text-yellow-500 hover:bg-yellow-100",
-        "priority-high": "bg-red-50 text-red-500 hover:bg-red-100",
-        "priority-critical": "bg-red-100 text-red-600 hover:bg-red-200",
+        // Priority badges with dark mode
+        "priority-low": "bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700",
+        "priority-medium": "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-400 dark:hover:bg-yellow-900",
+        "priority-high": "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900",
+        "priority-critical": "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800",
         
-        // Severity badges
-        "severity-minor": "bg-green-50 text-green-500 hover:bg-green-100",
-        "severity-major": "bg-orange-50 text-orange-500 hover:bg-orange-100",
-        "severity-blocker": "bg-red-50 text-red-500 hover:bg-red-100",
+        // Severity badges with dark mode
+        "severity-minor": "bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900",
+        "severity-major": "bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-400 dark:hover:bg-orange-900",
+        "severity-blocker": "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900",
         
-        // Legacy variants for backward compatibility
-        default: "bg-blue-50 text-blue-500 hover:bg-blue-100",
-        secondary: "bg-green-50 text-green-500 hover:bg-green-100",
-        destructive: "bg-red-50 text-red-500 hover:bg-red-100",
-        outline: "bg-gray-100 text-gray-500 hover:bg-gray-200",
+        // Legacy variants for backward compatibility with dark mode
+        default: "bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900",
+        secondary: "bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900",
+        destructive: "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900",
+        outline: "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700",
       },
     },
     defaultVariants: {

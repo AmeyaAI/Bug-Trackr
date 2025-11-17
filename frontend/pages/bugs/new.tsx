@@ -12,7 +12,6 @@ import { useRouter } from "next/router";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -33,6 +32,7 @@ import { BugPriority, BugSeverity, Project } from "@/utils/types";
 import { useUser } from "@/contexts/UserContext";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { useToast } from "@/contexts/ToastContext";
 import { AxiosError } from "axios";
 
@@ -199,21 +199,15 @@ export default function NewBugPage() {
 
               {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="description">
-                  Description <span className="text-destructive">*</span>
-                </Label>
-                <Textarea
-                  id="description"
+                <MarkdownEditor
+                  value={watch("description")}
+                  onChange={(value) => setValue("description", value, { shouldValidate: true })}
+                  label="Description"
+                  required={true}
                   placeholder="Detailed description of the bug, including steps to reproduce"
-                  rows={6}
-                  {...register("description", {
-                    required: "Description is required",
-                    minLength: {
-                      value: 20,
-                      message: "Description must be at least 20 characters",
-                    },
-                  })}
-                  className={errors.description ? "border-destructive" : ""}
+                  minHeight="250px"
+                  error={!!errors.description}
+                  disabled={isSubmitting}
                 />
                 {errors.description && (
                   <p className="text-sm text-destructive">

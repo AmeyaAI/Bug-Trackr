@@ -6,7 +6,7 @@
  */
 
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import {
   IconBug,
@@ -17,6 +17,10 @@ import {
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/contexts/UserContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { SidebarUserSelector } from "@/components/SidebarUserSelector";
+import { userApi } from "@/utils/apiClient";
+import { User } from "@/utils/types";
 import Link from "next/link";
 
 interface AppSidebarProps {
@@ -26,6 +30,23 @@ interface AppSidebarProps {
 export function AppSidebar({ children }: AppSidebarProps) {
   const { currentUser } = useUser();
   const [open, setOpen] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      const usersData = await userApi.getAll();
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
 
   const links = [
     {
@@ -75,20 +96,18 @@ export function AppSidebar({ children }: AppSidebarProps) {
               ))}
             </div>
           </div>
-          <div>
-            {currentUser && (
-              <SidebarLink
-                link={{
-                  label: currentUser.name,
-                  href: "#",
-                  icon: (
-                    <div className="h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
-                      {currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                    </div>
-                  ),
-                }}
-              />
+          <div className="flex flex-col gap-2">
+            {/* User Selector */}
+            {!isLoadingUsers && users.length > 0 && (
+              <div className="border-t border-neutral-200 dark:border-neutral-700 pt-2">
+                <SidebarUserSelector users={users} isOpen={open} />
+              </div>
             )}
+            
+            {/* Theme Toggle */}
+            <div className="border-t border-neutral-200 dark:border-neutral-700 pt-2">
+              <ThemeToggle showLabel={open} className="w-full" />
+            </div>
           </div>
         </SidebarBody>
       </Sidebar>

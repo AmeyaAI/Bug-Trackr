@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/contexts/UserContext';
 import { bugApi, projectApi } from '@/utils/apiClient';
 import { Bug, Project, BugStatus, BugPriority } from '@/utils/types';
+import { getStatusBadgeVariant, getPriorityBadgeVariant, getProjectName } from '@/utils/badgeHelpers';
 import { AlertCircle, CheckCircle2, Clock, TrendingUp } from 'lucide-react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 
@@ -83,46 +84,9 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const getStatusBadgeVariant = (status: BugStatus): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case BugStatus.OPEN:
-        return "destructive";
-      case BugStatus.IN_PROGRESS:
-        return "default";
-      case BugStatus.RESOLVED:
-        return "secondary";
-      case BugStatus.CLOSED:
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
-
-  const getPriorityBadgeVariant = (priority: BugPriority): "default" | "secondary" | "destructive" | "outline" => {
-    switch (priority) {
-      case BugPriority.HIGHEST:
-        return "destructive";
-      case BugPriority.HIGH:
-        return "destructive";
-      case BugPriority.MEDIUM:
-        return "default";
-      case BugPriority.LOW:
-        return "default";
-      case BugPriority.LOWEST:
-        return "secondary";
-      default:
-        return "outline";
-    }
-  };
-
   const recentBugs = bugs
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
-
-  const getProjectName = (projectId: string): string => {
-    const project = projects.find(p => p._id === projectId);
-    return project?.name || 'Unknown Project';
-  };
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
@@ -240,7 +204,7 @@ export default function Home() {
                           {bug.description}
                         </p>
                         <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span>{getProjectName(bug.projectId)}</span>
+                          <span>{getProjectName(bug.projectId, projects)}</span>
                           <span>•</span>
                           <span>{new Date(bug.createdAt).toLocaleDateString()}</span>
                         </div>

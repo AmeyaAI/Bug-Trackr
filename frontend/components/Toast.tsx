@@ -45,26 +45,26 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return <CheckCircle2 className="size-5 text-green-600" />;
+        return <CheckCircle2 className="size-5 text-green-600 dark:text-green-400" />;
       case 'error':
-        return <XCircle className="size-5 text-red-600" />;
+        return <XCircle className="size-5 text-red-600 dark:text-red-400" />;
       case 'warning':
-        return <AlertTriangle className="size-5 text-yellow-600" />;
+        return <AlertTriangle className="size-5 text-yellow-600 dark:text-yellow-400" />;
       case 'info':
-        return <Info className="size-5 text-blue-600" />;
+        return <Info className="size-5 text-blue-600 dark:text-blue-400" />;
     }
   };
 
   const getBackgroundColor = () => {
     switch (toast.type) {
       case 'success':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800';
       case 'error':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800';
       case 'warning':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800';
       case 'info':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800';
     }
   };
 
@@ -81,12 +81,12 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
       <div className="flex-shrink-0 mt-0.5">{getIcon()}</div>
       
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">{toast.message}</p>
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{toast.message}</p>
       </div>
 
       <button
         onClick={handleClose}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+        className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
         aria-label="Close notification"
       >
         <X className="size-4" />

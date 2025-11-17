@@ -5,6 +5,7 @@
 export { BugCard } from './BugCard';
 export { CommentSection } from './CommentSection';
 export { UserSelector } from './UserSelector';
+export { SidebarUserSelector } from './SidebarUserSelector';
 export { Layout } from './Layout';
 export { AppSidebar } from './AppSidebar';
 export { ErrorBoundary, withErrorBoundary } from './ErrorBoundary';
@@ -13,5 +14,7 @@ export { LoadingState, LoadingSpinner } from './LoadingState';
 export { ToastContainer } from './Toast';
 export { PriorityIcon } from './PriorityIcon';
 export { SeverityIcon } from './SeverityIcon';
+export { ThemeToggle, ThemeToggleCompact } from './ThemeToggle';
 export { default as WelcomeScreen } from './WelcomeScreen';
 export { default as SplitText } from './SplitText';
+export { MarkdownEditor } from './MarkdownEditor';

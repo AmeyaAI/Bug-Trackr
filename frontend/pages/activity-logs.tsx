@@ -47,7 +47,7 @@ const ActivityLogsPage: React.FC = () => {
             reported a bug in{' '}
             <button
               onClick={() => router.push(`/projects/${log.projectId}`)}
-              className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
             >
               {log.projectName}
             </button>
@@ -57,11 +57,11 @@ const ActivityLogsPage: React.FC = () => {
         return (
           <>
             assigned{' '}
-            <span className="font-semibold text-gray-900">{log.assignedToName || 'a user'}</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{log.assignedToName || 'a user'}</span>
             {' '}to a bug in{' '}
             <button
               onClick={() => router.push(`/projects/${log.projectId}`)}
-              className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
             >
               {log.projectName}
             </button>
@@ -71,11 +71,11 @@ const ActivityLogsPage: React.FC = () => {
         return (
           <>
             updated the bug status to{' '}
-            <span className="font-semibold text-gray-900">{log.newStatus || 'a new status'}</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{log.newStatus || 'a new status'}</span>
             {' '}in{' '}
             <button
               onClick={() => router.push(`/projects/${log.projectId}`)}
-              className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
             >
               {log.projectName}
             </button>
@@ -87,7 +87,7 @@ const ActivityLogsPage: React.FC = () => {
             validated a bug in{' '}
             <button
               onClick={() => router.push(`/projects/${log.projectId}`)}
-              className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
             >
               {log.projectName}
             </button>
@@ -99,7 +99,7 @@ const ActivityLogsPage: React.FC = () => {
             performed action &quot;{log.action}&quot; on bug in{' '}
             <button
               onClick={() => router.push(`/projects/${log.projectId}`)}
-              className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
             >
               {log.projectName}
             </button>
@@ -175,16 +175,16 @@ const ActivityLogsPage: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Activity Log</h1>
-        <p className="text-gray-600">Track all bug-related activities in your projects</p>
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">Activity Log</h1>
+        <p className="text-gray-600 dark:text-gray-400">Track all bug-related activities in your projects</p>
       </div>
 
       {activityLogs.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No activity logs found</p>
-              <p className="text-gray-400 mt-2">Start reporting and managing bugs to see activity here</p>
+              <p className="text-gray-500 dark:text-gray-400 text-lg">No activity logs found</p>
+              <p className="text-gray-400 dark:text-gray-500 mt-2">Start reporting and managing bugs to see activity here</p>
             </div>
           </CardContent>
         </Card>
@@ -200,23 +200,23 @@ const ActivityLogsPage: React.FC = () => {
                   {/* Activity Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900">{log.performedByName}</span>
-                      <span className="text-gray-600">{getActionText(log)}</span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">{log.performedByName}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{getActionText(log)}</span>
                     </div>
                     
                     {/* Bug Details */}
                     <div className="mt-2">
                       <button
                         onClick={() => router.push(`/bugs/${log.bugId}`)}
-                        className="text-gray-700 hover:text-gray-900 hover:underline inline-flex items-center gap-1"
+                        className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:underline inline-flex items-center gap-1"
                       >
-                        <span className="text-sm text-gray-500">Bug:</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Bug:</span>
                         <span className="font-medium">{log.bugTitle}</span>
                       </button>
                     </div>
                     
                     {/* Timestamp */}
-                    <div className="mt-2 text-sm text-gray-500">
+                    <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                       {formatTimestamp(log.timestamp)}
                     </div>
                   </div>

@@ -20,11 +20,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bug, BugStatus, BugPriority } from "@/utils/types";
+import { Bug, BugStatus } from "@/utils/types";
 import { getInitials } from "@/lib/utils";
 import { useUser, usePermission } from "@/contexts/UserContext";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
+import { getStatusBadgeVariant, getPriorityBadgeVariant } from "@/utils/badgeHelpers";
 
 interface BugCardProps {
   bug: Bug;
@@ -33,50 +34,6 @@ interface BugCardProps {
   onStatusUpdate?: (bugId: string, newStatus: BugStatus) => void;
   onViewDetails?: (bugId: string) => void;
 }
-
-/**
- * Get badge variant based on bug status
- */
-const getStatusVariant = (
-  status: BugStatus
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case BugStatus.OPEN:
-      return "destructive";
-    case BugStatus.IN_PROGRESS:
-      return "default";
-    case BugStatus.RESOLVED:
-      return "secondary";
-    case BugStatus.CLOSED:
-      return "outline";
-    default:
-      return "outline";
-  }
-};
-
-/**
- * Get badge variant based on priority
- */
-const getPriorityVariant = (
-  priority: BugPriority
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (priority) {
-    case BugPriority.HIGHEST:
-      return "destructive";
-    case BugPriority.HIGH:
-      return "destructive";
-    case BugPriority.MEDIUM:
-      return "default";
-    case BugPriority.LOW:
-      return "default";
-    case BugPriority.LOWEST:
-      return "secondary";
-    default:
-      return "outline";
-  }
-};
-
-
 
 export const BugCard: React.FC<BugCardProps> = ({
   bug,
@@ -114,10 +71,10 @@ export const BugCard: React.FC<BugCardProps> = ({
             </CardDescription>
           </div>
           <div className="flex flex-col gap-2 items-end flex-shrink-0">
-            <Badge variant={getStatusVariant(bug.status)} className="whitespace-nowrap">
+            <Badge variant={getStatusBadgeVariant(bug.status)} className="whitespace-nowrap">
               {bug.status}
             </Badge>
-            <Badge variant={getPriorityVariant(bug.priority)} className="whitespace-nowrap flex items-center gap-1">
+            <Badge variant={getPriorityBadgeVariant(bug.priority)} className="whitespace-nowrap flex items-center gap-1">
               <PriorityIcon priority={bug.priority} />
               {bug.priority}
             </Badge>

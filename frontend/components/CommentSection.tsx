@@ -10,11 +10,14 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Comment } from '@/utils/types';
 import { getInitials } from '@/lib/utils';
+import { formatRelativeTime } from '@/utils/badgeHelpers';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface CommentSectionProps {
   bugId: string;
@@ -24,31 +27,6 @@ interface CommentSectionProps {
   onAddComment: (bugId: string, message: string) => Promise<void>;
   getUserName?: (userId: string) => string;
 }
-
-
-
-/**
- * Format date to relative time
- */
-const formatRelativeTime = (dateString: string): string => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  
-  return date.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric',
-    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-  });
-};
 
 export const CommentSection: React.FC<CommentSectionProps> = ({
   bugId,
@@ -125,9 +103,11 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                           {formatRelativeTime(comment.createdAt)}
                         </span>
                       </div>
-                      <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                        {comment.message}
-                      </p>
+                      <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {comment.message}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 );
@@ -150,12 +130,12 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
             </Avatar>
 
             <div className="flex-1">
-              <Textarea
-                placeholder="Add a comment..."
+              <MarkdownEditor
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
+                onChange={setNewComment}
+                placeholder="Add a comment..."
+                minHeight="150px"
                 disabled={isSubmitting}
-                className="min-h-[80px] resize-none"
               />
             </div>
           </div>

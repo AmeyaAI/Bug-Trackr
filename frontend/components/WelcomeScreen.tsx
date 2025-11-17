@@ -97,8 +97,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onComplete, isDataLoaded 
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-gray-900"
-      style={{ backgroundColor: 'white' }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-neutral-900"
     >
       {stage === 'loading' && (
         <div ref={spinnerRef} className="flex flex-col items-center gap-6">

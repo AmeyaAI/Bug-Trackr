@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUser } from '@/contexts/UserContext';
 import { User } from '@/utils/types';
 import { getInitials } from '@/lib/utils';
+import { getRoleBadgeVariant, formatRole } from '@/utils/badgeHelpers';
 
 interface UserSelectorProps {
   users: User[];
@@ -27,37 +28,32 @@ interface UserSelectorProps {
   className?: string;
 }
 
-
-
-/**
- * Get badge variant based on user role
- */
-const getRoleBadgeVariant = (role: string): "default" | "secondary" | "destructive" | "outline" => {
-  switch (role.toLowerCase()) {
-    case 'admin':
-      return "destructive";
-    case 'developer':
-      return "default";
-    case 'tester':
-      return "secondary";
-    default:
-      return "outline";
-  }
-};
-
-/**
- * Format role for display
- */
-const formatRole = (role: string): string => {
-  return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-};
-
 export const UserSelector: React.FC<UserSelectorProps> = ({
   users,
   onUserChange,
   className,
 }) => {
   const { currentUser, setCurrentUser } = useUser();
+
+  // Auto-select first user if no user is selected
+  React.useEffect(() => {
+    if (!currentUser && users.length > 0) {
+      setCurrentUser(users[0]);
+      if (onUserChange) {
+        onUserChange(users[0]);
+      }
+    } else if (currentUser && users.length > 0) {
+      // Check if current user still exists in the users list
+      const userExists = users.some(u => u._id === currentUser._id);
+      if (!userExists) {
+        // User was deleted, select first available user
+        setCurrentUser(users[0]);
+        if (onUserChange) {
+          onUserChange(users[0]);
+        }
+      }
+    }
+  }, [users, currentUser, setCurrentUser, onUserChange]);
 
   // Derive selectedUserId from currentUser instead of syncing state
   const selectedUserId = currentUser?._id || '';
