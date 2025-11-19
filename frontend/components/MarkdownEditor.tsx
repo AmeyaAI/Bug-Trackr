@@ -114,7 +114,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   // Formatting functions
   const formatBold = useCallback(() => insertText('**', '**', 'bold text'), [insertText]);
   const formatItalic = useCallback(() => insertText('*', '*', 'italic text'), [insertText]);
-  const formatUnderline = useCallback(() => insertText('__', '__', 'underlined text'), [insertText]);
+  const formatUnderline = useCallback(() => insertText('<u>', '</u>', 'underlined text'), [insertText]);
   const formatStrikethrough = useCallback(() => insertText('~~', '~~', 'strikethrough text'), [insertText]);
   const formatInlineCode = useCallback(() => insertText('`', '`', 'code'), [insertText]);
   const formatCodeBlock = useCallback(() => insertText('\n```\n', '\n```\n', 'code block'), [insertText]);
