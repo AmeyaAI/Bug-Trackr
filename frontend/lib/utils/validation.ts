@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { UserRole } from '../models/user';
 import { BugStatus, BugPriority, BugSeverity, BugTag } from '../models/bug';
+import { ActivityAction } from '../models/activity';
 
 // User schemas
 export const createUserSchema = z.object({
@@ -150,10 +151,9 @@ export const createActivitySchema = z.object({
     required_error: 'Bug ID is required',
     invalid_type_error: 'Bug ID must be a string',
   }).min(1, 'Bug ID cannot be empty'),
-  action: z.string({
-    required_error: 'Action is required',
-    invalid_type_error: 'Action must be a string',
-  }).min(1, 'Action cannot be empty'),
+  action: z.nativeEnum(ActivityAction, {
+    errorMap: () => ({ message: 'Invalid activity action. Must be reported, assigned, status_changed, or commented' }),
+  }),
   authorId: z.string({
     required_error: 'Author user ID is required',
     invalid_type_error: 'Author user ID must be a string',

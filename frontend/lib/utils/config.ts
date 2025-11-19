@@ -49,6 +49,16 @@ export function loadConfig(): AppConfig {
     throw new Error('Invalid APPFLYTE_COLLECTION_BASE_URL: Must be a valid URL');
   }
   
+  // Validate API key format (fail fast before making API requests)
+  if (trimmedApiKey.length < 10) {
+    throw new Error('Invalid APPFLYTE_COLLECTION_API_KEY: API key is too short (minimum 10 characters)');
+  }
+  
+  // Check for valid characters (alphanumeric, hyphens, underscores)
+  if (!/^[a-zA-Z0-9_-]+$/.test(trimmedApiKey)) {
+    throw new Error('Invalid APPFLYTE_COLLECTION_API_KEY: API key contains invalid characters (only alphanumeric, hyphens, and underscores allowed)');
+  }
+  
   // Cache and return
   configInstance = {
     collectionBaseUrl: trimmedUrl,
