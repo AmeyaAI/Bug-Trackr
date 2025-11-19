@@ -22,6 +22,13 @@ const COLLECTION_SINGULAR = 'bug_tracking_activities';
 export class ActivityRepository {
   constructor(private readonly collectionDb: CollectionDBService) {}
 
+  /**
+   * Creates a new activity in the collection database.
+   *
+   * @param {CreateActivityInput} activityData - The data for the activity to create.
+   * @returns {Promise<Activity>} The created activity.
+   * @throws {Error} If the activity could not be created.
+   */
   async create(activityData: CreateActivityInput): Promise<Activity> {
     logger.debug('Creating activity', { bugId: activityData.bugId, action: activityData.action });
 
@@ -43,6 +50,12 @@ export class ActivityRepository {
     return createdActivity;
   }
 
+  /**
+   * Fetches all activities from the collection.
+   *
+   * @returns {Promise<Activity[]>} Promise resolving to an array of Activity objects.
+   * @throws {Error} If the database service fails to fetch activities.
+   */
   async getAll(): Promise<Activity[]> {
     logger.debug('Fetching all activities');
 
@@ -55,6 +68,13 @@ export class ActivityRepository {
     return activities;
   }
 
+  /**
+   * Fetches an activity by its unique identifier.
+   *
+   * @param activityId - The unique identifier of the activity to retrieve.
+   * @returns The activity if found, or null if not found.
+   * @throws {Error} If the underlying database service fails.
+   */
   async getById(activityId: string): Promise<Activity | null> {
     logger.debug('Fetching activity by ID', { activityId });
 
@@ -72,6 +92,13 @@ export class ActivityRepository {
     return activity;
   }
 
+  /**
+   * Fetches all activities associated with a specific bug.
+   *
+   * @param {string} bugId - The unique identifier of the bug to filter activities by.
+   * @returns {Promise<Activity[]>} A promise that resolves to an array of activities related to the specified bug.
+   * @throws {Error} If the underlying database query fails.
+   */
   async getByBug(bugId: string): Promise<Activity[]> {
     logger.debug('Fetching activities by bug', { bugId });
 
@@ -94,6 +121,13 @@ export class ActivityRepository {
     return activities;
   }
 
+  /**
+   * Fetches the most recent activities up to the specified limit.
+   *
+   * @param {number} limit - The maximum number of recent activities to retrieve (max 1000).
+   * @returns {Promise<Activity[]>} A promise that resolves to an array of recent activities.
+   * @throws {Error} If the underlying database query fails.
+   */
   async getRecent(limit: number): Promise<Activity[]> {
     logger.debug('Fetching recent activities', { limit });
 

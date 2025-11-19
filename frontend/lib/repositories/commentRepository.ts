@@ -24,6 +24,13 @@ const COLLECTION_SINGULAR = 'bug_tracking_comments';
 export class CommentRepository {
   constructor(private readonly collectionDb: CollectionDBService) {}
 
+  /**
+   * Creates a new comment in the collection database.
+   *
+   * @param {CreateCommentInput} commentData - The data for the comment to create.
+   * @returns {Promise<Comment>} The created comment.
+   * @throws {Error} If the comment could not be created.
+   */
   async create(commentData: CreateCommentInput): Promise<Comment> {
     logger.debug('Creating comment', { bugId: commentData.bugId, authorId: commentData.authorId });
 
@@ -41,6 +48,12 @@ export class CommentRepository {
     return createdComment;
   }
 
+  /**
+   * Fetches all comments from the collection.
+   *
+   * @returns {Promise<Comment[]>} A promise that resolves to an array of Comment objects.
+   * @throws {Error} If the database operation fails.
+   */
   async getAll(): Promise<Comment[]> {
     logger.debug('Fetching all comments');
 
@@ -53,6 +66,13 @@ export class CommentRepository {
     return comments;
   }
 
+  /**
+   * Fetches a comment by its unique identifier.
+   *
+   * @param {string} commentId - The unique identifier of the comment to fetch.
+   * @returns {Promise<Comment | null>} The comment if found, or null if not found.
+   * @throws {Error} If the underlying database service throws an error.
+   */
   async getById(commentId: string): Promise<Comment | null> {
     logger.debug('Fetching comment by ID', { commentId });
 
@@ -70,6 +90,13 @@ export class CommentRepository {
     return comment;
   }
 
+  /**
+   * Fetches all comments associated with a specific bug.
+   * 
+   * @param {string} bugId - The ID of the bug to fetch comments for.
+   * @returns {Promise<Comment[]>} A promise that resolves to an array of comments for the given bug.
+   * @throws {Error} If the database query fails.
+   */
   async getByBug(bugId: string): Promise<Comment[]> {
     logger.debug('Fetching comments by bug', { bugId });
 
@@ -92,6 +119,13 @@ export class CommentRepository {
     return comments;
   }
 
+  /**
+   * Deletes a comment by its ID.
+   *
+   * @param {string} commentId - The ID of the comment to delete.
+   * @returns {Promise<boolean>} True if the comment was deleted successfully, false otherwise.
+   * @throws {Error} If the deletion fails due to a database error.
+   */
   async delete(commentId: string): Promise<boolean> {
     logger.debug('Deleting comment', { commentId });
 
@@ -101,6 +135,13 @@ export class CommentRepository {
     return deleted;
   }
 
+  /**
+   * Retrieves the bug associated with the given comment.
+   *
+   * @param {Comment} comment - The comment whose related bug is to be fetched.
+   * @returns {Promise<Bug | null>} The associated bug if found, otherwise null.
+   * @throws {Error} If the underlying database service fails.
+   */
   async getBug(comment: Comment): Promise<Bug | null> {
     logger.debug('Fetching comment bug', { commentId: comment.id, bugId: comment.bugId });
 
@@ -112,9 +153,7 @@ export class CommentRepository {
     if (bug) {
       const transformedBug = {
         ...bug,
-        tags: typeof bug.tags === 'string' 
-          ? (bug.tags as string).split(',').map(t => t.trim())
-          : [],
+        tags: transformTags(bug.tags),
       } as Bug;
       
       logger.info('Comment bug fetched successfully', { commentId: comment.id, bugId: transformedBug.id });
@@ -125,6 +164,13 @@ export class CommentRepository {
     }
   }
 
+  /**
+   * Fetches the author (user) of a given comment.
+   *
+   * @param {Comment} comment - The comment whose author is to be retrieved.
+   * @returns {Promise<User | null>} The user who authored the comment, or null if not found.
+   * @throws {Error} If there is a problem accessing the database.
+   */
   async getAuthor(comment: Comment): Promise<User | null> {
     logger.debug('Fetching comment author', { commentId: comment.id, authorId: comment.authorId });
 
