@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    /* Light mode colors */
-    --background: 0 0% 100%;
+    /* Light mode colors - Activity Log Design System Compatible */
+    --background: 0 0% 98%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
@@ -25,15 +25,22 @@
     --input: 0 0% 89.8%;
     --ring: 217 91% 60%;
     --radius: 0.5rem;
+    
+    /* Activity Log Design System - Light Mode */
+    --activity-canvas: 249 250 251;
+    --activity-card: 0 0% 100%;
+    --activity-card-hover: 249 250 251;
+    --activity-border: 229 231 235;
+    --activity-timeline-rail: 229 231 235;
   }
 
   .dark {
-    /* Dark mode colors */
-    --background: 0 0% 7%;
+    /* Dark mode colors - Activity Log Design System */
+    --background: 222 47% 2%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 10%;
+    --card: 216 34% 7%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 10%;
+    --popover: 216 34% 7%;
     --popover-foreground: 0 0% 98%;
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 98%;
@@ -48,6 +55,15 @@
     --border: 0 0% 20%;
     --input: 0 0% 20%;
     --ring: 217 91% 60%;
+    
+    /* Activity Log Design System - Dark Mode */
+    --activity-canvas: 222 47% 2%;
+    --activity-subtle: 217 47% 4%;
+    --activity-raised: 216 34% 7%;
+    --activity-card: 216 34% 10%;
+    --activity-card-hover: 216 28% 14%;
+    --activity-border: 215 20% 17%;
+    --activity-timeline-rail: 215 20% 17%;
   }
 
   body {
