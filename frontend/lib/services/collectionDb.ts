@@ -190,8 +190,15 @@ export class CollectionDBService {
   /**
    * Parses Collection DB response and transforms to application format
    * Handles nested payload structures and field name conversion
+   * 
+   * ID Handling:
+   * - Extracts __auto_id__ from Collection DB response as the primary ID
+   * - Converts it to 'id' field in the returned object
+   * - If data already contains an 'id' field that differs from __auto_id__, 
+   *   logs a warning and uses __auto_id__ as the authoritative source
+   * 
    * @param response - Raw Collection DB response
-   * @returns Parsed and transformed item
+   * @returns Parsed and transformed item with 'id' field
    * @private
    */
   private parseResponse<T>(response: CollectionDBResponse<unknown>): T {
@@ -200,14 +207,24 @@ export class CollectionDBService {
     
     // Extract __auto_id__ as the primary ID
     const dataWithId = data as Record<string, unknown>;
-    const id = response.__auto_id__ || dataWithId.__auto_id__;
+    const autoId = response.__auto_id__ || dataWithId.__auto_id__;
     
     // Convert snake_case to camelCase
     const camelCaseData = keysToCamelCase(data);
     
-    // Add ID to the result if it exists
-    if (id) {
-      return { ...camelCaseData, id } as T;
+    // Handle ID injection with conflict detection
+    if (autoId) {
+      // Check for existing ID that differs from __auto_id__
+      if (camelCaseData.id && camelCaseData.id !== autoId) {
+        logger.warn('ID conflict detected in Collection DB response', {
+          existingId: camelCaseData.id,
+          autoId: autoId,
+          resolution: 'Using __auto_id__ as authoritative source',
+        });
+      }
+      
+      // Always use __auto_id__ as the authoritative ID
+      return { ...camelCaseData, id: autoId } as T;
     }
     
     return camelCaseData as T;
