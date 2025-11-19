@@ -25,113 +25,119 @@ import { logger } from '../utils/logger';
 
 /**
  * Service Container class that manages all application services and repositories
- * Provides dependency injection and lifecycle management
+ * Provides dependency injection and lifecycle management with lazy initialization
  */
 export class ServiceContainer {
-  private collectionDb: CollectionDBService;
-  private userRepository: UserRepository;
-  private projectRepository: ProjectRepository;
-  private bugRepository: BugRepository;
-  private commentRepository: CommentRepository;
-  private activityRepository: ActivityRepository;
+  private collectionDb: CollectionDBService | null = null;
+  private userRepository: UserRepository | null = null;
+  private projectRepository: ProjectRepository | null = null;
+  private bugRepository: BugRepository | null = null;
+  private commentRepository: CommentRepository | null = null;
+  private activityRepository: ActivityRepository | null = null;
   private config: AppConfig;
-  private isInitialized: boolean = false;
+  private isInitialized: boolean = true;
 
   /**
    * Creates a new ServiceContainer instance
-   * Initializes Collection DB service and all repositories
+   * Services and repositories are lazily initialized on first access
    * @param config - Application configuration
    */
   constructor(config: AppConfig) {
-    logger.info('Initializing ServiceContainer');
-    
+    logger.info('ServiceContainer created (services will be lazily initialized)');
     this.config = config;
-    
-    // Initialize Collection DB service
-    logger.debug('Initializing Collection DB service', {
-      baseUrl: config.collectionBaseUrl,
-      debug: config.debug,
-    });
-    
-    this.collectionDb = new CollectionDBService(
-      config.collectionBaseUrl,
-      config.collectionApiKey
-    );
-    
-    // Initialize repositories with Collection DB service
-    logger.debug('Initializing repositories');
-    
-    this.userRepository = new UserRepository(this.collectionDb);
-    this.projectRepository = new ProjectRepository(this.collectionDb);
-    this.bugRepository = new BugRepository(this.collectionDb);
-    this.commentRepository = new CommentRepository(this.collectionDb);
-    this.activityRepository = new ActivityRepository(this.collectionDb);
-    
-    this.isInitialized = true;
-    
-    logger.info('ServiceContainer initialized successfully', {
-      repositories: [
-        'UserRepository',
-        'ProjectRepository',
-        'BugRepository',
-        'CommentRepository',
-        'ActivityRepository',
-      ],
-    });
   }
 
   /**
-   * Gets the UserRepository instance
+   * Lazily initializes the Collection DB service
+   * @returns CollectionDBService instance
+   */
+  private initializeCollectionDB(): CollectionDBService {
+    if (!this.collectionDb) {
+      logger.debug('Lazy initializing Collection DB service', {
+        baseUrl: this.config.collectionBaseUrl,
+        debug: this.config.debug,
+      });
+      
+      this.collectionDb = new CollectionDBService(
+        this.config.collectionBaseUrl,
+        this.config.collectionApiKey
+      );
+    }
+    return this.collectionDb;
+  }
+
+  /**
+   * Gets the UserRepository instance (lazy initialization)
    * @returns UserRepository for user data operations
    */
   getUserRepository(): UserRepository {
     this.ensureInitialized();
+    if (!this.userRepository) {
+      logger.debug('Lazy initializing UserRepository');
+      this.userRepository = new UserRepository(this.initializeCollectionDB());
+    }
     return this.userRepository;
   }
 
   /**
-   * Gets the ProjectRepository instance
+   * Gets the ProjectRepository instance (lazy initialization)
    * @returns ProjectRepository for project data operations
    */
   getProjectRepository(): ProjectRepository {
     this.ensureInitialized();
+    if (!this.projectRepository) {
+      logger.debug('Lazy initializing ProjectRepository');
+      this.projectRepository = new ProjectRepository(this.initializeCollectionDB());
+    }
     return this.projectRepository;
   }
 
   /**
-   * Gets the BugRepository instance
+   * Gets the BugRepository instance (lazy initialization)
    * @returns BugRepository for bug data operations
    */
   getBugRepository(): BugRepository {
     this.ensureInitialized();
+    if (!this.bugRepository) {
+      logger.debug('Lazy initializing BugRepository');
+      this.bugRepository = new BugRepository(this.initializeCollectionDB());
+    }
     return this.bugRepository;
   }
 
   /**
-   * Gets the CommentRepository instance
+   * Gets the CommentRepository instance (lazy initialization)
    * @returns CommentRepository for comment data operations
    */
   getCommentRepository(): CommentRepository {
     this.ensureInitialized();
+    if (!this.commentRepository) {
+      logger.debug('Lazy initializing CommentRepository');
+      this.commentRepository = new CommentRepository(this.initializeCollectionDB());
+    }
     return this.commentRepository;
   }
 
   /**
-   * Gets the ActivityRepository instance
+   * Gets the ActivityRepository instance (lazy initialization)
    * @returns ActivityRepository for activity log operations
    */
   getActivityRepository(): ActivityRepository {
     this.ensureInitialized();
+    if (!this.activityRepository) {
+      logger.debug('Lazy initializing ActivityRepository');
+      this.activityRepository = new ActivityRepository(this.initializeCollectionDB());
+    }
     return this.activityRepository;
   }
 
   /**
-   * Gets the Collection DB service instance
+   * Gets the Collection DB service instance (lazy initialization)
    * @returns CollectionDBService for direct database operations
    */
   getCollectionDBService(): CollectionDBService {
     this.ensureInitialized();
-    return this.collectionDb;
+    return this.initializeCollectionDB();
   }
 
   /**
@@ -169,8 +175,18 @@ export class ServiceContainer {
     logger.info('Shutting down ServiceContainer');
     
     try {
-      // Close Collection DB service
-      await this.collectionDb.close();
+      // Close Collection DB service if it was initialized
+      if (this.collectionDb) {
+        await this.collectionDb.close();
+      }
+      
+      // Clear all repository references
+      this.userRepository = null;
+      this.projectRepository = null;
+      this.bugRepository = null;
+      this.commentRepository = null;
+      this.activityRepository = null;
+      this.collectionDb = null;
       
       this.isInitialized = false;
       
