@@ -36,16 +36,7 @@ function getInitialTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light');
-
-  // Synchronously update theme after mount but before paint to avoid flicker
-  // This setState in effect is intentional to prevent hydration mismatch
-  useLayoutEffect(() => {
-    const initialTheme = getInitialTheme();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setThemeState(initialTheme);
-  }, []);
-
+  const [theme, setThemeState] = useState<Theme>(() => getInitialTheme());
   // Apply theme to document root whenever it changes
   useEffect(() => {
     const root = document.documentElement;

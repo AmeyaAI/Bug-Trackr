@@ -20,4 +20,4 @@ export interface Activity {
   readonly timestamp: Date;
 }
 
-export type CreateActivityInput = Omit<Activity, 'id'>;
+export type CreateActivityInput = Omit<Activity, 'id' | 'timestamp'>;

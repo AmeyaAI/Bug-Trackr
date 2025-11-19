@@ -54,7 +54,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users, currentUser, setCurrentUser]);
+  }, [users, currentUser, setCurrentUser, onUserChange]);
 
   // Derive selectedUserId from currentUser instead of syncing state
   const selectedUserId = currentUser?._id || '';

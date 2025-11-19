@@ -57,5 +57,6 @@ export interface Bug {
   readonly updatedAt: Date;
 }
 
-export type CreateBugInput = Omit<Bug, 'id' | 'createdAt' | 'updatedAt'>;
+export type CreateBugInput = Omit<Bug, 'id' | 'createdAt' | 'updatedAt'> &
+  Partial<Pick<Bug, 'status' | 'assignedTo' | 'attachments' | 'tags'>>;
 export type UpdateBugInput = Partial<Omit<Bug, 'id' | 'createdAt' | 'updatedAt'>>;

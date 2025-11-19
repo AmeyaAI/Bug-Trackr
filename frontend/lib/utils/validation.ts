@@ -85,6 +85,11 @@ export const createBugSchema = z.object({
   tags: z.array(z.nativeEnum(BugTag, {
     errorMap: () => ({ message: 'Invalid bug tag. Must be Epic, Task, Suggestion, Bug:Frontend, Bug:Backend, or Bug:Test' }),
   })).optional().default([]),
+  status: z.nativeEnum(BugStatus, {
+    errorMap: () => ({ message: 'Invalid bug status. Must be Open, In Progress, Resolved, or Closed' }),
+  }).optional(),
+  assignedTo: z.string().min(1, 'Assigned user ID cannot be empty').optional(),
+  attachments: z.array(z.string()).optional().default([]),
 });
 
 export const updateBugStatusSchema = z.object({
