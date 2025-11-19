@@ -34,19 +34,29 @@ export function AppSidebar({ children }: AppSidebarProps) {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    
+    const loadUsers = async () => {
+      try {
+        const usersData = await userApi.getAll();
+        if (isMounted) {
+          setUsers(usersData);
+        }
+      } catch (error) {
+        console.error('Failed to load users:', error);
+      } finally {
+        if (isMounted) {
+          setIsLoadingUsers(false);
+        }
+      }
+    };
+    
     loadUsers();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  const loadUsers = async () => {
-    try {
-      const usersData = await userApi.getAll();
-      setUsers(usersData);
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    } finally {
-      setIsLoadingUsers(false);
-    }
-  };
 
   const links = [
     {
