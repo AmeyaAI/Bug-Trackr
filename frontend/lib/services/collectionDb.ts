@@ -207,7 +207,7 @@ export class CollectionDBService {
     
     // Add ID to the result if it exists
     if (id) {
-      camelCaseData.id = id;
+      return { ...camelCaseData, id } as T;
     }
     
     return camelCaseData as T;
@@ -279,17 +279,7 @@ export class CollectionDBService {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('Failed to create item', {
-        collection: collectionPlural,
-        status: response.status,
-        error: errorText,
-      });
-      
-      if (response.status === 400) {
-        throw new Error(`Validation error: ${errorText}`);
-      }
-      throw new Error(`Failed to create item: ${response.status} ${errorText}`);
+      await this.handleErrorResponse(response, 'create item', collectionPlural);
     }
 
     const result = await response.json();
@@ -324,13 +314,7 @@ export class CollectionDBService {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('Failed to fetch items', {
-        collection: collectionPlural,
-        status: response.status,
-        error: errorText,
-      });
-      throw new Error(`Failed to fetch items: ${response.status} ${errorText}`);
+      await this.handleErrorResponse(response, 'fetch items', collectionPlural);
     }
 
     const result = await response.json();
@@ -338,6 +322,12 @@ export class CollectionDBService {
     // Handle both array and paginated response formats
     const items = Array.isArray(result) ? result : (result.items || []);
     
+    if (!Array.isArray(result) && !result.items) {
+      logger.warn('Unexpected response format from Collection DB', { 
+        collection: collectionPlural, 
+        responseKeys: result && typeof result === 'object' ? Object.keys(result) : typeof result 
+      });
+    }
     logger.info('Items fetched successfully', {
       collection: collectionPlural,
       count: items.length,
@@ -373,14 +363,7 @@ export class CollectionDBService {
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('Failed to fetch item', {
-        collection: collectionSingular,
-        id,
-        status: response.status,
-        error: errorText,
-      });
-      throw new Error(`Failed to fetch item: ${response.status} ${errorText}`);
+      await this.handleErrorResponse(response, 'fetch item', collectionSingular, id);
     }
 
     const result = await response.json();
