@@ -51,11 +51,11 @@ export interface Bug {
   projectId: string;        // Relation to Project.id
   reportedBy: string;       // Relation to User.id
   assignedTo: string | null; // Relation to User.id (nullable)
-  attachments: string;
+  attachments: string;      // Comma-separated URLs or file paths
   tags: BugTag[];           // Array of predefined tags (can be multiple)
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
 
-export type CreateBugInput = Omit<Bug, 'id'>;
-export type UpdateBugInput = Partial<Omit<Bug, 'id'>>;
+export type CreateBugInput = Omit<Bug, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateBugInput = Partial<Omit<Bug, 'id' | 'createdAt' | 'updatedAt'>>;

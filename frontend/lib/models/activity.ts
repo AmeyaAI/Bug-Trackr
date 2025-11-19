@@ -15,7 +15,7 @@ export enum ActivityAction {
 export interface Activity {
   readonly id: string;
   bugId: string;      // Relation to Bug.id
-  action: ActivityAction | string;  // ActivityAction enum or custom string
+  action: ActivityAction;  // ActivityAction enum for type safety
   authorId: string;   // Relation to User.id
   readonly timestamp: Date;
 }

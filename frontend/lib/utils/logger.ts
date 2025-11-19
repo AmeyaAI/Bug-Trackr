@@ -8,8 +8,9 @@ const isDebug = process.env.DEBUG === 'true';
 
 /**
  * Formats log output with timestamp
+ * @returns Array of log arguments for console methods
  */
-function formatLog(level: string, message: string, context?: any): void {
+function formatLog(level: string, message: string, context?: any): [string] | [string, any] {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] [${level}] ${message}`;
   
@@ -18,6 +19,11 @@ function formatLog(level: string, message: string, context?: any): void {
   }
   return [logMessage];
 }
+
+/**
+ * Check if console methods are available (browser compatibility)
+ */
+const hasConsole = typeof console !== 'undefined';
 
 export const logger = {
   /**
@@ -28,6 +34,7 @@ export const logger = {
    * logger.error('Failed to fetch data', { userId: '123', error: err });
    */
   error: (message: string, context?: any) => {
+    if (!hasConsole) return;
     const args = formatLog('ERROR', message, context);
     console.error(...args);
   },
@@ -40,6 +47,7 @@ export const logger = {
    * logger.warn('Deprecated API usage', { endpoint: '/old-api' });
    */
   warn: (message: string, context?: any) => {
+    if (!hasConsole) return;
     const args = formatLog('WARN', message, context);
     console.warn(...args);
   },
@@ -52,6 +60,7 @@ export const logger = {
    * logger.info('User logged in', { userId: '123' });
    */
   info: (message: string, context?: any) => {
+    if (!hasConsole) return;
     const args = formatLog('INFO', message, context);
     console.info(...args);
   },
@@ -64,9 +73,8 @@ export const logger = {
    * logger.debug('Cache hit', { key: 'user:123', ttl: 300 });
    */
   debug: (message: string, context?: any) => {
-    if (isDebug) {
-      const args = formatLog('DEBUG', message, context);
-      console.debug(...args);
-    }
+    if (!hasConsole || !isDebug) return;
+    const args = formatLog('DEBUG', message, context);
+    console.debug(...args);
   },
 };

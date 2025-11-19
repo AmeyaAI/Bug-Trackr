@@ -6,7 +6,7 @@
  */
 
 "use client";
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useLayoutEffect } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -18,24 +18,45 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    // Initialize from localStorage or system preference only on client
-    if (typeof window === 'undefined') return 'light';
-    
+// Helper to get initial theme (only runs on client)
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'light';
+  
+  try {
     const savedTheme = localStorage.getItem('theme') as Theme | null;
-    if (savedTheme) return savedTheme;
-    
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return prefersDark ? 'dark' : 'light';
-  });
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      return savedTheme;
+    }
+  } catch (error) {
+    console.warn('Failed to read theme from localStorage:', error);
+  }
+  
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return prefersDark ? 'dark' : 'light';
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>('light');
+
+  // Synchronously update theme after mount but before paint to avoid flicker
+  // This setState in effect is intentional to prevent hydration mismatch
+  useLayoutEffect(() => {
+    const initialTheme = getInitialTheme();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setThemeState(initialTheme);
+  }, []);
 
   // Apply theme to document root whenever it changes
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);
-    localStorage.setItem('theme', theme);
+    
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (error) {
+      console.warn('Failed to save theme to localStorage:', error);
+    }
   }, [theme]);
 
   const toggleTheme = () => {

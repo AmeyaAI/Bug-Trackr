@@ -46,7 +46,7 @@ export const createProjectSchema = z.object({
   description: z.string({
     required_error: 'Project description is required',
     invalid_type_error: 'Project description must be a string',
-  }).min(1, 'Project description cannot be empty'),
+  }).min(1, 'Project description cannot be empty').max(2000, 'Project description must be 2000 characters or less'),
   createdBy: z.string({
     required_error: 'Creator user ID is required',
     invalid_type_error: 'Creator user ID must be a string',
@@ -55,8 +55,7 @@ export const createProjectSchema = z.object({
 
 export const updateProjectSchema = z.object({
   name: z.string().min(1).max(200).optional(),
-  description: z.string().min(1).optional(),
-  createdBy: z.string().min(1).optional(),
+  description: z.string().min(1).max(2000).optional(),
 });
 
 // Bug schemas
@@ -68,7 +67,7 @@ export const createBugSchema = z.object({
   description: z.string({
     required_error: 'Bug description is required',
     invalid_type_error: 'Bug description must be a string',
-  }).min(1, 'Bug description cannot be empty'),
+  }).min(1, 'Bug description cannot be empty').max(5000, 'Bug description must be 5000 characters or less'),
   projectId: z.string({
     required_error: 'Project ID is required',
     invalid_type_error: 'Project ID must be a string',
@@ -114,12 +113,11 @@ export const assignBugSchema = z.object({
 
 export const updateBugSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  description: z.string().min(1).optional(),
+  description: z.string().min(1).max(5000).optional(),
   status: z.nativeEnum(BugStatus).optional(),
   priority: z.nativeEnum(BugPriority).optional(),
   severity: z.nativeEnum(BugSeverity).optional(),
   projectId: z.string().min(1).optional(),
-  reportedBy: z.string().min(1).optional(),
   assignedTo: z.string().min(1).nullable().optional(),
   attachments: z.string().optional(),
   tags: z.array(z.nativeEnum(BugTag)).optional(),
@@ -138,7 +136,7 @@ export const createCommentSchema = z.object({
   message: z.string({
     required_error: 'Comment message is required',
     invalid_type_error: 'Comment message must be a string',
-  }).min(1, 'Comment message cannot be empty'),
+  }).min(1, 'Comment message cannot be empty').max(2000, 'Comment message must be 2000 characters or less'),
 });
 
 // Activity schemas

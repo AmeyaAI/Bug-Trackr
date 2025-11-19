@@ -10,4 +10,4 @@ export interface Comment {
   readonly createdAt: Date;
 }
 
-export type CreateCommentInput = Omit<Comment, 'id'>;
+export type CreateCommentInput = Omit<Comment, 'id' | 'createdAt'>;

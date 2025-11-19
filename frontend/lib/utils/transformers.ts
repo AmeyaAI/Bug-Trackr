@@ -190,25 +190,13 @@ export function bugTagsToString(tags: string[]): string {
 
 /**
  * Converts a comma-separated string to an array of BugTag enum values
- * Validates that each tag is a valid BugTag enum value
+ * Note: Validation should be done using Zod schemas at the API boundary
+ * This function only performs string parsing
  * @param tagsStr - Comma-separated string of tags
- * @returns Array of BugTag enum values (as strings)
- * @throws {Error} If any tag is not a valid BugTag enum value
+ * @returns Array of tag strings
  * @example
  * bugTagsFromString('Epic,Bug:Frontend') // returns ['Epic', 'Bug:Frontend']
  */
 export function bugTagsFromString(tagsStr: string): string[] {
-  const tags = tagsFromString(tagsStr);
-  
-  // Import BugTag enum values for validation
-  const validTags = ['Epic', 'Task', 'Suggestion', 'Bug:Frontend', 'Bug:Backend', 'Bug:Test'];
-  
-  // Validate each tag
-  for (const tag of tags) {
-    if (!validTags.includes(tag)) {
-      throw new Error(`Invalid bug tag: ${tag}. Must be one of: ${validTags.join(', ')}`);
-    }
-  }
-  
-  return tags;
+  return tagsFromString(tagsStr);
 }

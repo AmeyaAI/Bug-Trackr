@@ -86,14 +86,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const newText = value.substring(0, start) + before + textToInsert + after + value.substring(end);
     onChange(newText);
 
-    // Set cursor position after insertion
     setTimeout(() => {
-      const newCursorPos = start + before.length + textToInsert.length + after.length;
+      // Select the inserted text so user can immediately type to replace placeholder
+      const selectionStart = start + before.length;
+      const selectionEnd = selectionStart + textToInsert.length;
       textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
+      textarea.setSelectionRange(selectionStart, selectionEnd);
     }, 0);
   }, [value, onChange]);
-
   // Insert text at line start
   const insertAtLineStart = useCallback((prefix: string) => {
     const textarea = textareaRef.current;
@@ -112,19 +112,40 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   }, [value, onChange]);
 
   // Formatting functions
-  const formatBold = () => insertText('**', '**', 'bold text');
-  const formatItalic = () => insertText('*', '*', 'italic text');
-  const formatUnderline = () => insertText('<u>', '</u>', 'underlined text');
-  const formatStrikethrough = () => insertText('~~', '~~', 'strikethrough text');
-  const formatInlineCode = () => insertText('`', '`', 'code');
-  const formatCodeBlock = () => insertText('\n```\n', '\n```\n', 'code block');
-  const formatHeading1 = () => insertAtLineStart('# ');
-  const formatHeading2 = () => insertAtLineStart('## ');
-  const formatHeading3 = () => insertAtLineStart('### ');
-  const formatBulletList = () => insertAtLineStart('- ');
-  const formatNumberedList = () => insertAtLineStart('1. ');
-  const formatQuote = () => insertAtLineStart('> ');
-  const formatDivider = () => insertText('\n\n---\n\n');
+  const formatBold = useCallback(() => insertText('**', '**', 'bold text'), [insertText]);
+  const formatItalic = useCallback(() => insertText('*', '*', 'italic text'), [insertText]);
+  const formatUnderline = useCallback(() => insertText('__', '__', 'underlined text'), [insertText]);
+  const formatStrikethrough = useCallback(() => insertText('~~', '~~', 'strikethrough text'), [insertText]);
+  const formatInlineCode = useCallback(() => insertText('`', '`', 'code'), [insertText]);
+  const formatCodeBlock = useCallback(() => insertText('\n```\n', '\n```\n', 'code block'), [insertText]);
+  const formatHeading1 = useCallback(() => insertAtLineStart('# '), [insertAtLineStart]);
+  const formatHeading2 = useCallback(() => insertAtLineStart('## '), [insertAtLineStart]);
+  const formatHeading3 = useCallback(() => insertAtLineStart('### '), [insertAtLineStart]);
+  const formatBulletList = useCallback(() => insertAtLineStart('- '), [insertAtLineStart]);
+  const formatNumberedList = useCallback(() => insertAtLineStart('1. '), [insertAtLineStart]);
+  const formatQuote = useCallback(() => insertAtLineStart('> '), [insertAtLineStart]);
+  const formatDivider = useCallback(() => insertText('\n\n---\n\n'), [insertText]);
+
+  // Keyboard shortcuts handler
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !disabled) {
+        if (e.key === 'b') {
+          e.preventDefault();
+          formatBold();
+        } else if (e.key === 'i') {
+          e.preventDefault();
+          formatItalic();
+        }
+      }
+    };
+
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.addEventListener('keydown', handleKeyDown);
+      return () => textarea.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [disabled, formatBold, formatItalic]);
 
   return (
     <div>
@@ -397,16 +418,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                     h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 mt-6">{children}</h1>,
                     h2: ({ children }) => <h2 className="text-xl font-semibold mb-3 mt-5">{children}</h2>,
                     h3: ({ children }) => <h3 className="text-lg font-medium mb-2 mt-4">{children}</h3>,
-                    code: ({ inline, children, ...props }: any) => 
-                      inline ? (
-                        <code className="px-1.5 py-0.5 rounded bg-muted text-sm font-mono" {...props}>
+                    code: (props) => {
+                      const { inline, children, ...rest } = props as { inline?: boolean; children?: React.ReactNode };
+                      return inline ? (
+                        <code className="px-1.5 py-0.5 rounded bg-muted text-sm font-mono" {...rest}>
                           {children}
                         </code>
                       ) : (
-                        <code className="block p-3 rounded bg-muted text-sm font-mono overflow-x-auto" {...props}>
+                        <code className="block p-3 rounded bg-muted text-sm font-mono overflow-x-auto" {...rest}>
                           {children}
                         </code>
-                      ),
+                      );
+                    },
                     blockquote: ({ children }) => (
                       <blockquote className="border-l-4 border-muted-foreground/30 pl-4 italic text-muted-foreground">
                         {children}

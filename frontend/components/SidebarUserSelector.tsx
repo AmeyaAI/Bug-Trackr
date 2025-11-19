@@ -47,7 +47,8 @@ export const SidebarUserSelector: React.FC<SidebarUserSelectorProps> = ({
         }
       }
     }
-  }, [users, currentUser, setCurrentUser, onUserChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, currentUser, setCurrentUser]);
 
   const handleUserSelect = (user: User) => {
     setCurrentUser(user);

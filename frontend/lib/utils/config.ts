@@ -38,17 +38,21 @@ export function loadConfig(): AppConfig {
     throw new Error('Missing required environment variable: APPFLYTE_COLLECTION_API_KEY');
   }
   
+  // Trim values before validation
+  const trimmedUrl = collectionBaseUrl.trim();
+  const trimmedApiKey = collectionApiKey.trim();
+  
   // Validate URL format
   try {
-    new URL(collectionBaseUrl);
+    new URL(trimmedUrl);
   } catch {
     throw new Error('Invalid APPFLYTE_COLLECTION_BASE_URL: Must be a valid URL');
   }
   
   // Cache and return
   configInstance = {
-    collectionBaseUrl: collectionBaseUrl.trim(),
-    collectionApiKey: collectionApiKey.trim(),
+    collectionBaseUrl: trimmedUrl,
+    collectionApiKey: trimmedApiKey,
     debug: process.env.DEBUG === 'true',
   };
   
