@@ -11,6 +11,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServiceContainer } from '@/lib/services/serviceContainer';
 import { logger } from '@/lib/utils/logger';
+import type { Project } from '@/lib/models/project';
+
+/**
+ * Response types for type-safe API responses
+ */
+type ProjectSuccessResponse = Project;
+
+type ErrorResponse = {
+  error: string;
+  details?: string;
+};
 
 /**
  * GET /api/projects/[id] - Get project by ID
@@ -19,11 +30,11 @@ import { logger } from '@/lib/utils/logger';
  * - id: Project ID
  * 
  * Returns: Project object
- * Status Codes: 200 (success), 404 (not found), 500 (server error)
+ * Status Codes: 200 (success), 404 (not found), 400 (bad request), 500 (server error)
  */
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse<ProjectSuccessResponse | ErrorResponse>
 ) {
   if (req.method !== 'GET') {
     return res.status(405).json({

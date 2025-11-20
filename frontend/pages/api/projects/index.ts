@@ -11,6 +11,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServiceContainer } from '@/lib/services/serviceContainer';
 import { logger } from '@/lib/utils/logger';
+import type { Project } from '@/lib/models/project';
+
+/**
+ * Response types for type-safe API responses
+ */
+type ProjectsSuccessResponse = Project[];
+
+type ErrorResponse = {
+  error: string;
+  details?: string;
+};
 
 /**
  * GET /api/projects - List all projects
@@ -18,7 +29,10 @@ import { logger } from '@/lib/utils/logger';
  * Returns: Array of project objects
  * Status Codes: 200 (success), 500 (server error)
  */
-async function handleGet(req: NextApiRequest, res: NextApiResponse) {
+async function handleGet(
+  req: NextApiRequest,
+  res: NextApiResponse<ProjectsSuccessResponse | ErrorResponse>
+) {
   try {
     const services = getServiceContainer();
     const projectRepo = services.getProjectRepository();
@@ -44,7 +58,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
  */
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse<ProjectsSuccessResponse | ErrorResponse>
 ) {
   if (req.method === 'GET') {
     return handleGet(req, res);
