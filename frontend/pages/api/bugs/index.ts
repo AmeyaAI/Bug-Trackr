@@ -38,6 +38,16 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     
     const { projectId, status, assignedTo } = req.query;
     
+    // Validate query parameter types first
+    if ((projectId !== undefined && typeof projectId !== 'string') ||
+        (status !== undefined && typeof status !== 'string') ||
+        (assignedTo !== undefined && typeof assignedTo !== 'string')) {
+      return res.status(400).json({
+        error: 'Invalid query parameters',
+        details: 'Each query parameter must have a single value',
+      });
+    }
+    
     // Count how many filters are provided
     const filterCount = [projectId, status, assignedTo].filter(param => param !== undefined).length;
     
@@ -45,16 +55,24 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     if (filterCount > 1) {
       return res.status(400).json({
         error: 'Multiple filters not supported',
-        details: 'Only one filter parameter (projectId, status, or assignedTo) can be used at a time. To use multiple filters, make separate requests or retrieve all bugs and filter client-side.',
+        details: 'Only one filter parameter (projectId, status, or assignedTo) can be used at a time. To filter by multiple criteria, retrieve all bugs without filters and apply filtering client-side.',
       });
     }
     
     // Validate status parameter if provided
-    if (status && !Object.values(BugStatus).includes(status as BugStatus)) {
-      return res.status(400).json({
-        error: 'Invalid status parameter',
-        details: `Status must be one of: ${Object.values(BugStatus).join(', ')}`,
-      });
+    if (status) {
+      if (typeof status !== 'string') {
+        return res.status(400).json({
+          error: 'Invalid status parameter',
+          details: 'Status must be a single value',
+        });
+      }
+      if (!Object.values(BugStatus).includes(status as BugStatus)) {
+        return res.status(400).json({
+          error: 'Invalid status parameter',
+          details: `Status must be one of: ${Object.values(BugStatus).join(', ')}`,
+        });
+      }
     }
     
     let bugs;
