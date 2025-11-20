@@ -35,7 +35,7 @@ export class ServiceContainer {
   private commentRepository: CommentRepository | null = null;
   private activityRepository: ActivityRepository | null = null;
   private config: AppConfig;
-  private isInitialized: boolean = true;
+  private isActive: boolean = true;
 
   /**
    * Creates a new ServiceContainer instance
@@ -71,7 +71,7 @@ export class ServiceContainer {
    * @returns UserRepository for user data operations
    */
   getUserRepository(): UserRepository {
-    this.ensureInitialized();
+    this.ensureActive();
     if (!this.userRepository) {
       logger.debug('Lazy initializing UserRepository');
       this.userRepository = new UserRepository(this.initializeCollectionDB());
@@ -84,7 +84,7 @@ export class ServiceContainer {
    * @returns ProjectRepository for project data operations
    */
   getProjectRepository(): ProjectRepository {
-    this.ensureInitialized();
+    this.ensureActive();
     if (!this.projectRepository) {
       logger.debug('Lazy initializing ProjectRepository');
       this.projectRepository = new ProjectRepository(this.initializeCollectionDB());
@@ -97,7 +97,7 @@ export class ServiceContainer {
    * @returns BugRepository for bug data operations
    */
   getBugRepository(): BugRepository {
-    this.ensureInitialized();
+    this.ensureActive();
     if (!this.bugRepository) {
       logger.debug('Lazy initializing BugRepository');
       this.bugRepository = new BugRepository(this.initializeCollectionDB());
@@ -110,7 +110,7 @@ export class ServiceContainer {
    * @returns CommentRepository for comment data operations
    */
   getCommentRepository(): CommentRepository {
-    this.ensureInitialized();
+    this.ensureActive();
     if (!this.commentRepository) {
       logger.debug('Lazy initializing CommentRepository');
       this.commentRepository = new CommentRepository(this.initializeCollectionDB());
@@ -123,7 +123,7 @@ export class ServiceContainer {
    * @returns ActivityRepository for activity log operations
    */
   getActivityRepository(): ActivityRepository {
-    this.ensureInitialized();
+    this.ensureActive();
     if (!this.activityRepository) {
       logger.debug('Lazy initializing ActivityRepository');
       this.activityRepository = new ActivityRepository(this.initializeCollectionDB());
@@ -136,7 +136,7 @@ export class ServiceContainer {
    * @returns CollectionDBService for direct database operations
    */
   getCollectionDBService(): CollectionDBService {
-    this.ensureInitialized();
+    this.ensureActive();
     return this.initializeCollectionDB();
   }
 
@@ -149,29 +149,35 @@ export class ServiceContainer {
   }
 
   /**
-   * Checks if the service container is initialized
-   * @returns True if initialized, false otherwise
+   * Checks if the service container is active and ready to use
+   * @returns True if active, false if closed
    */
   isReady(): boolean {
-    return this.isInitialized;
+    return this.isActive;
   }
 
   /**
-   * Ensures the service container is initialized before use
-   * @throws {Error} If the service container is not initialized
+   * Ensures the service container is active before use
+   * @throws {Error} If the service container has been closed
    */
-  private ensureInitialized(): void {
-    if (!this.isInitialized) {
-      throw new Error('ServiceContainer is not initialized');
+  private ensureActive(): void {
+    if (!this.isActive) {
+      throw new Error('ServiceContainer has been closed and cannot be used');
     }
   }
 
   /**
    * Closes all services and cleans up resources
    * Should be called during application shutdown
+   * After calling close(), the container cannot be used anymore
    * @returns Promise that resolves when cleanup is complete
    */
   async close(): Promise<void> {
+    if (!this.isActive) {
+      logger.warn('ServiceContainer is already closed');
+      return;
+    }
+
     logger.info('Shutting down ServiceContainer');
     
     try {
@@ -188,7 +194,8 @@ export class ServiceContainer {
       this.activityRepository = null;
       this.collectionDb = null;
       
-      this.isInitialized = false;
+      // Mark container as inactive
+      this.isActive = false;
       
       logger.info('ServiceContainer shutdown complete');
     } catch (error) {
@@ -205,12 +212,19 @@ export class ServiceContainer {
 let serviceContainerInstance: ServiceContainer | null = null;
 
 /**
+ * Tracks initialization errors to prevent repeated failed attempts
+ * If initialization fails once, subsequent calls will immediately throw
+ * the cached error instead of retrying
+ */
+let initializationError: Error | null = null;
+
+/**
  * Gets the singleton ServiceContainer instance
  * Creates a new instance if one doesn't exist
  * Uses configuration from environment variables
  * 
  * @returns ServiceContainer singleton instance
- * @throws {Error} If required environment variables are missing
+ * @throws {Error} If required environment variables are missing or initialization failed previously
  * 
  * @example
  * // In an API route
@@ -227,14 +241,40 @@ let serviceContainerInstance: ServiceContainer | null = null;
  * }
  */
 export function getServiceContainer(): ServiceContainer {
+  // If initialization failed previously, throw immediately with context
+  if (initializationError) {
+    logger.error('ServiceContainer initialization failed previously, not retrying', {
+      originalError: initializationError.message,
+    });
+    throw new Error(
+      `ServiceContainer failed to initialize previously: ${initializationError.message}`,
+      { cause: initializationError }
+    );
+  }
+
   if (!serviceContainerInstance) {
-    logger.debug('Creating new ServiceContainer instance');
-    
-    // Load configuration from environment variables
-    const config = loadConfig();
-    
-    // Create new service container
-    serviceContainerInstance = new ServiceContainer(config);
+    try {
+      logger.debug('Creating new ServiceContainer instance');
+      
+      // Load configuration from environment variables
+      const config = loadConfig();
+      
+      // Create new service container
+      serviceContainerInstance = new ServiceContainer(config);
+      
+      // Clear any previous error on successful initialization
+      initializationError = null;
+    } catch (error) {
+      // Cache the error to prevent repeated initialization attempts
+      initializationError = error as Error;
+      
+      logger.error('ServiceContainer initialization failed', {
+        error: initializationError.message,
+      });
+      
+      // Re-throw the original error
+      throw error;
+    }
   }
   
   return serviceContainerInstance;
@@ -244,6 +284,7 @@ export function getServiceContainer(): ServiceContainer {
  * Resets the singleton ServiceContainer instance
  * Useful for testing or when configuration changes
  * Closes the existing instance before resetting
+ * Also clears any cached initialization errors
  * 
  * @returns Promise that resolves when reset is complete
  * 
@@ -252,6 +293,11 @@ export function getServiceContainer(): ServiceContainer {
  * afterEach(async () => {
  *   await resetServiceContainer();
  * });
+ * 
+ * @example
+ * // Retry after fixing configuration
+ * await resetServiceContainer();
+ * const services = getServiceContainer(); // Will retry initialization
  */
 export async function resetServiceContainer(): Promise<void> {
   if (serviceContainerInstance) {
@@ -266,6 +312,12 @@ export async function resetServiceContainer(): Promise<void> {
     serviceContainerInstance = null;
     logger.debug('ServiceContainer instance reset complete');
   }
+  
+  // Clear any cached initialization error to allow retry
+  if (initializationError) {
+    logger.debug('Clearing cached initialization error');
+    initializationError = null;
+  }
 }
 
 /**
@@ -279,4 +331,21 @@ export async function resetServiceContainer(): Promise<void> {
  */
 export function isServiceContainerInitialized(): boolean {
   return serviceContainerInstance !== null && serviceContainerInstance.isReady();
+}
+
+/**
+ * Gets the cached initialization error if one exists
+ * Useful for diagnostics and error reporting
+ * 
+ * @returns The initialization error or null if no error occurred
+ * 
+ * @example
+ * const error = getInitializationError();
+ * if (error) {
+ *   console.error('ServiceContainer failed to initialize:', error.message);
+ *   // Maybe show a helpful error page to the user
+ * }
+ */
+export function getInitializationError(): Error | null {
+  return initializationError;
 }

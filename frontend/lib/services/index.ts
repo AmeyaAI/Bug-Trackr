@@ -11,4 +11,5 @@ export {
   getServiceContainer,
   resetServiceContainer,
   isServiceContainerInitialized,
+  getInitializationError,
 } from './serviceContainer';
