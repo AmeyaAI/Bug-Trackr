@@ -44,7 +44,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
       }
     } else if (currentUser && users.length > 0) {
       // Check if current user still exists in the users list
-      const userExists = users.some(u => u._id === currentUser._id);
+      const userExists = users.some(u => u.id === currentUser.id);
       if (!userExists) {
         // User was deleted, select first available user
         setCurrentUser(users[0]);
@@ -57,10 +57,10 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
   }, [users, currentUser, setCurrentUser, onUserChange]);
 
   // Derive selectedUserId from currentUser instead of syncing state
-  const selectedUserId = currentUser?._id || '';
+  const selectedUserId = currentUser?.id || '';
 
   const handleValueChange = (userId: string) => {
-    const user = users.find(u => u._id === userId) || null;
+    const user = users.find(u => u.id === userId) || null;
     setCurrentUser(user);
     
     if (onUserChange) {
@@ -88,7 +88,7 @@ export const UserSelector: React.FC<UserSelectorProps> = ({
 
         <SelectContent>
           {users.map((user) => (
-            <SelectItem key={user._id} value={user._id}>
+            <SelectItem key={user.id} value={user.id}>
               <div className="flex items-center gap-2 w-full">
                 <Avatar className="size-6">
                   <AvatarFallback className="text-xs">

@@ -48,13 +48,13 @@ export const BugCard: React.FC<BugCardProps> = ({
 
   const handleStatusChange = (newStatus: BugStatus) => {
     if (onStatusUpdate) {
-      onStatusUpdate(bug._id, newStatus);
+      onStatusUpdate(bug.id, newStatus);
     }
   };
 
   const handleViewDetails = () => {
     if (onViewDetails) {
-      onViewDetails(bug._id);
+      onViewDetails(bug.id);
     }
   };
 

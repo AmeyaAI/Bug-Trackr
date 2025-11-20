@@ -288,11 +288,16 @@ export class CollectionDBService {
     // Convert camelCase to snake_case for Collection DB
     const snakeCaseData = keysToSnakeCase(data);
     
+    // Wrap data in collection_item as required by Collection DB API
+    const requestBody = {
+      collection_item: snakeCaseData
+    };
+    
     logger.debug('Creating item', { collection: collectionPlural, data: snakeCaseData });
 
     const response = await this.makeRequest(url, {
       method: 'POST',
-      body: JSON.stringify(snakeCaseData),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -336,15 +341,45 @@ export class CollectionDBService {
 
     const result = await response.json();
     
-    // Handle both array and paginated response formats
-    const items = Array.isArray(result) ? result : (result.items || []);
+    // Collection DB response format:
+    // {
+    //   "Collection": "collection_name",
+    //   "last_evaluated_key": null,
+    //   "<uuid>": [ array of items ],
+    //   "published_collections_detail": [...]
+    // }
     
-    if (!Array.isArray(result) && !result.items) {
-      logger.warn('Unexpected response format from Collection DB', { 
-        collection: collectionPlural, 
-        responseKeys: result && typeof result === 'object' ? Object.keys(result) : typeof result 
-      });
+    let items: unknown[] = [];
+    
+    if (Array.isArray(result)) {
+      // Direct array response
+      items = result;
+    } else if (result && typeof result === 'object') {
+      // Find the UUID key that contains the items array
+      const keys = Object.keys(result);
+      for (const key of keys) {
+        // Skip known metadata keys
+        if (key === 'Collection' || key === 'last_evaluated_key' || key === 'published_collections_detail') {
+          continue;
+        }
+        // Check if this key contains an array (the actual items)
+        if (Array.isArray(result[key])) {
+          items = result[key];
+          logger.debug('Found items in UUID key', { 
+            collection: collectionPlural, 
+            uuidKey: key,
+            count: items.length 
+          });
+          break;
+        }
+      }
+      
+      // Fallback to items property if no UUID key found
+      if (items.length === 0 && result.items) {
+        items = result.items;
+      }
     }
+    
     logger.info('Items fetched successfully', {
       collection: collectionPlural,
       count: items.length,
@@ -414,11 +449,23 @@ export class CollectionDBService {
     // Convert camelCase to snake_case for Collection DB
     const snakeCaseUpdates = keysToSnakeCase(updates);
     
+    // Convert updates to Collection DB fields format
+    // Format: { "id": "item_id", "fields": [{ "path": "$.field", "value": value }] }
+    const fields = Object.entries(snakeCaseUpdates).map(([key, value]) => ({
+      path: `$.${key}`,
+      value: value
+    }));
+    
+    const requestBody = {
+      id: id,
+      fields: fields
+    };
+    
     logger.debug('Updating item', { collection: collectionSingular, id, updates: snakeCaseUpdates });
 
     const response = await this.makeRequest(url, {
       method: 'PUT',
-      body: JSON.stringify(snakeCaseUpdates),
+      body: JSON.stringify(requestBody),
     });
 
     if (response.status === 404) {
@@ -441,13 +488,14 @@ export class CollectionDBService {
       throw new Error(`Failed to update item: ${response.status} ${errorText}`);
     }
 
-    const result = await response.json();
-    logger.info('Item updated successfully', {
+    // Update successful - now fetch the updated item
+    // Collection DB UPDATE may not return the full item, so we fetch it
+    logger.info('Item updated successfully, fetching updated item', {
       collection: collectionSingular,
       id,
     });
 
-    return this.parseResponse<T>(result);
+    return this.getItemById<T>(collectionSingular, id) as Promise<T>;
   }
 
   /**

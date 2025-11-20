@@ -183,9 +183,9 @@ export default function Home() {
             <div className="space-y-3">
               {recentBugs.map((bug) => (
                 <Card 
-                  key={bug._id} 
+                  key={bug.id} 
                   className="hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => router.push(`/bugs/${bug._id}`)}
+                  onClick={() => router.push(`/bugs/${bug.id}`)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">

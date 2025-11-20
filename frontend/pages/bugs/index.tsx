@@ -216,9 +216,9 @@ export default function BugsPage() {
                 <tbody>
                   {filteredBugs.map((bug) => (
                     <tr 
-                      key={bug._id} 
+                      key={bug.id} 
                       className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                      onClick={() => handleViewDetails(bug._id)}
+                      onClick={() => handleViewDetails(bug.id)}
                     >
                       <td className="px-6 py-4">
                         <div className="font-medium text-foreground">{bug.title}</div>

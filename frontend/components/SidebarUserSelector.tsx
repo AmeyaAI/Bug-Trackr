@@ -38,7 +38,7 @@ export const SidebarUserSelector: React.FC<SidebarUserSelectorProps> = ({
       }
     } else if (currentUser && users.length > 0) {
       // Check if current user still exists in the users list
-      const userExists = users.some(u => u._id === currentUser._id);
+      const userExists = users.some(u => u.id === currentUser.id);
       if (!userExists) {
         // User was deleted, select first available user
         setCurrentUser(users[0]);
@@ -111,10 +111,10 @@ export const SidebarUserSelector: React.FC<SidebarUserSelectorProps> = ({
             <div className="mt-1 max-h-60 overflow-y-auto bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-md shadow-lg">
               {users.map((user) => (
                 <button
-                  key={user._id}
+                  key={user.id}
                   onClick={() => handleUserSelect(user)}
                   className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors ${
-                    user._id === currentUser._id
+                    user.id === currentUser.id
                       ? 'bg-neutral-100 dark:bg-neutral-800'
                       : ''
                   }`}

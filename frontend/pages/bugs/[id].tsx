@@ -82,9 +82,9 @@ export default function BugDetailsPage() {
       setProject(projectData);
       
       // Find reported by and assigned users
-      const reporter = usersData.find(u => u._id === bugData.bug.reportedBy);
+      const reporter = usersData.find(u => u.id === bugData.bug.reportedBy);
       const assignee = bugData.bug.assignedTo 
-        ? usersData.find(u => u._id === bugData.bug.assignedTo)
+        ? usersData.find(u => u.id === bugData.bug.assignedTo)
         : null;
       
       setReportedByUser(reporter || null);
@@ -114,7 +114,7 @@ export default function BugDetailsPage() {
     try {
       await commentApi.create({
         bugId,
-        authorId: currentUser._id,
+        authorId: currentUser.id,
         message,
       });
       
@@ -137,8 +137,8 @@ export default function BugDetailsPage() {
     setIsSubmitting(true);
     try {
       await handleEventualConsistency(
-        () => bugApi.validate(bug._id, currentUser._id, currentUser.role),
-        () => loadBugDetails(bug._id)
+        () => bugApi.validate(bug.id, currentUser.id, currentUser.role),
+        () => loadBugDetails(bug.id)
       );
       toast.success('Bug validated successfully');
     } catch (err) {
@@ -161,12 +161,12 @@ export default function BugDetailsPage() {
     setIsSubmitting(true);
     try {
       await handleEventualConsistency(
-        () => bugApi.updateStatus(bug._id, {
+        () => bugApi.updateStatus(bug.id, {
           status: BugStatus.CLOSED,
-          userId: currentUser._id,
+          userId: currentUser.id,
           userRole: currentUser.role as UserRole,
         }),
-        () => loadBugDetails(bug._id)
+        () => loadBugDetails(bug.id)
       );
       toast.success('Bug closed successfully');
     } catch (err) {
@@ -184,11 +184,11 @@ export default function BugDetailsPage() {
     setIsSubmitting(true);
     try {
       await handleEventualConsistency(
-        () => bugApi.assign(bug._id, {
+        () => bugApi.assign(bug.id, {
           assignedTo: selectedAssignee,
-          assignedBy: currentUser._id,
+          assignedBy: currentUser.id,
         }),
-        () => loadBugDetails(bug._id)
+        () => loadBugDetails(bug.id)
       );
       toast.success('Bug assigned successfully');
       setShowAssignDialog(false);
@@ -208,12 +208,12 @@ export default function BugDetailsPage() {
     setIsSubmitting(true);
     try {
       await handleEventualConsistency(
-        () => bugApi.updateStatus(bug._id, {
+        () => bugApi.updateStatus(bug.id, {
           status: selectedStatus,
-          userId: currentUser._id,
+          userId: currentUser.id,
           userRole: currentUser.role as UserRole,
         }),
-        () => loadBugDetails(bug._id)
+        () => loadBugDetails(bug.id)
       );
       toast.success('Bug status updated successfully');
       setShowStatusDialog(false);
@@ -413,9 +413,9 @@ export default function BugDetailsPage() {
         {/* Comments section */}
         {currentUser && (
           <CommentSection
-            bugId={bug._id}
+            bugId={bug.id}
             comments={comments}
-            currentUserId={currentUser._id}
+            currentUserId={currentUser.id}
             currentUserName={currentUser.name}
             onAddComment={handleAddComment}
             getUserName={getUserName}
@@ -438,7 +438,7 @@ export default function BugDetailsPage() {
               </SelectTrigger>
               <SelectContent>
                 {users.map(user => (
-                  <SelectItem key={user._id} value={user._id}>
+                  <SelectItem key={user.id} value={user.id}>
                     {user.name} ({user.role})
                   </SelectItem>
                 ))}
