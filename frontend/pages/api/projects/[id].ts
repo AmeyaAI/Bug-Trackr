@@ -30,7 +30,7 @@ type ErrorResponse = {
  * - id: Project ID
  * 
  * Returns: Project object
- * Status Codes: 200 (success), 404 (not found), 400 (bad request), 500 (server error)
+ * Status Codes: 200 (success), 400 (bad request), 404 (not found), 405 (method not allowed), 500 (server error)
  */
 export default async function handler(
   req: NextApiRequest,
