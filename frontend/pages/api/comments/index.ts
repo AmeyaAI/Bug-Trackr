@@ -43,7 +43,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     let comments;
     
     // Apply filter if bugId is provided
-    if (bugId && typeof bugId === 'string') {
+    if (bugId) {
       logger.debug('Fetching comments by bug', { bugId });
       comments = await commentRepo.getByBug(bugId);
     } else {

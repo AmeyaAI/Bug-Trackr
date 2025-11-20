@@ -50,10 +50,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     
     // Apply filter based on query parameters
     // Priority: bugId > limit > all
-    if (bugId && typeof bugId === 'string') {
+    if (bugId) {
       logger.debug('Fetching activities by bug', { bugId });
       activities = await activityRepo.getByBug(bugId);
-    } else if (limit && typeof limit === 'string') {
+    } else if (limit) {
       const limitNum = parseInt(limit, 10);
       
       // Validate limit is a valid number
