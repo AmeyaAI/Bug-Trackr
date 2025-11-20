@@ -20,13 +20,16 @@ import { logger } from '@/lib/utils/logger';
 /**
  * GET /api/bugs - List all bugs with optional filtering
  * 
- * Query Parameters:
+ * Query Parameters (mutually exclusive - only one filter allowed at a time):
  * - projectId: Filter bugs by project ID
  * - status: Filter bugs by status (Open, In Progress, Resolved, Closed)
  * - assignedTo: Filter bugs by assignee user ID
  * 
+ * Note: If multiple filter parameters are provided, a 400 error will be returned.
+ * To retrieve all bugs without filtering, omit all query parameters.
+ * 
  * Returns: Array of bug objects
- * Status Codes: 200 (success), 400 (invalid query params), 500 (server error)
+ * Status Codes: 200 (success), 400 (invalid or multiple query params), 500 (server error)
  */
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -35,7 +38,18 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     
     const { projectId, status, assignedTo } = req.query;
     
-    // Validate query parameters
+    // Count how many filters are provided
+    const filterCount = [projectId, status, assignedTo].filter(param => param !== undefined).length;
+    
+    // Ensure only one filter is provided at a time
+    if (filterCount > 1) {
+      return res.status(400).json({
+        error: 'Multiple filters not supported',
+        details: 'Only one filter parameter (projectId, status, or assignedTo) can be used at a time. To use multiple filters, make separate requests or retrieve all bugs and filter client-side.',
+      });
+    }
+    
+    // Validate status parameter if provided
     if (status && !Object.values(BugStatus).includes(status as BugStatus)) {
       return res.status(400).json({
         error: 'Invalid status parameter',
@@ -45,7 +59,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     
     let bugs;
     
-    // Apply filters based on query parameters
+    // Apply single filter based on query parameter
     if (projectId && typeof projectId === 'string') {
       logger.debug('Fetching bugs by project', { projectId });
       bugs = await bugRepo.getByProject(projectId);
