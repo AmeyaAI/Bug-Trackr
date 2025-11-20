@@ -126,7 +126,7 @@ export const handleApiError = (error: AxiosError<ApiErrorResponse>): string => {
           return data.details.map((err: unknown) => {
             if (typeof err === 'object' && err !== null) {
               const errObj = err as Record<string, unknown>;
-              return errObj.message || errObj.msg || JSON.stringify(err);
+              return errObj.message || JSON.stringify(err);
             }
             return String(err);
           }).join(', ');
@@ -225,7 +225,6 @@ export const bugApi = {
     }
     return response.data;
   },
-
 
 
   /**
