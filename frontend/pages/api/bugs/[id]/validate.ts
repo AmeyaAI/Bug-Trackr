@@ -126,6 +126,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
     
     logger.info('Bug validated successfully', { bugId: id, userId: body.userId });
     return res.status(200).json({
+      success: true,
       message: 'Bug validated successfully',
       bug: updatedBug,
     });
