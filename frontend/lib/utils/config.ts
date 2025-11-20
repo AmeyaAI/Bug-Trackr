@@ -54,9 +54,9 @@ export function loadConfig(): AppConfig {
     throw new Error('Invalid APPFLYTE_COLLECTION_API_KEY: API key is too short (minimum 10 characters)');
   }
   
-  // Check for valid characters (alphanumeric, hyphens, underscores)
-  if (!/^[a-zA-Z0-9_-]+$/.test(trimmedApiKey)) {
-    throw new Error('Invalid APPFLYTE_COLLECTION_API_KEY: API key contains invalid characters (only alphanumeric, hyphens, and underscores allowed)');
+  // Check for valid characters (alphanumeric, hyphens, underscores, dots for JWT tokens)
+  if (!/^[a-zA-Z0-9_.-]+$/.test(trimmedApiKey)) {
+    throw new Error('Invalid APPFLYTE_COLLECTION_API_KEY: API key contains invalid characters (only alphanumeric, hyphens, underscores, and dots allowed)');
   }
   
   // Cache and return
