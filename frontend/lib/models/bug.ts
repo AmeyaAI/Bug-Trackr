@@ -53,6 +53,7 @@ export interface Bug {
   assignedTo: string | null; // Relation to User.id (nullable)
   attachments: string;      // Comma-separated URLs or file paths
   tags: BugTag[];           // Array of predefined tags (can be multiple)
+  validated: boolean;       // Whether bug has been validated by tester
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

@@ -40,12 +40,9 @@ const notifyRequestListeners = () => {
   requestListeners.forEach(listener => listener(activeRequests));
 };
 
-// API configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-// Create axios instance with base configuration
+// API configuration - using relative paths for Next.js API routes
+// No baseURL needed since we're using relative paths (/api/*)
 const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -99,16 +96,12 @@ apiClient.interceptors.response.use(
 );
 
 /**
- * API Error Response structure
+ * API Error Response structure (Next.js API routes format)
  */
 export interface ApiErrorResponse {
-  detail?: string | ValidationError[];
-}
-
-interface ValidationError {
-  msg: string;
-  loc: string[];
-  type: string;
+  error?: string;           // Human-readable error message
+  details?: unknown;        // Optional additional context (e.g., Zod validation errors)
+  code?: string;            // Optional error code for client handling
 }
 
 /**
@@ -120,31 +113,37 @@ export const handleApiError = (error: AxiosError<ApiErrorResponse>): string => {
     const status = error.response.status;
     const data = error.response.data;
     
+    // Try to extract error message from new format first
+    if (data?.error) {
+      return data.error;
+    }
+    
+    // Fallback to status-based messages
     switch (status) {
       case 400:
-        return data?.detail && typeof data.detail === 'string' 
-          ? data.detail 
-          : 'Invalid request. Please check your input.';
+        // Check if details contains Zod validation errors
+        if (data?.details && Array.isArray(data.details)) {
+          return data.details.map((err: unknown) => {
+            if (typeof err === 'object' && err !== null) {
+              const errObj = err as Record<string, unknown>;
+              return errObj.message || errObj.msg || JSON.stringify(err);
+            }
+            return String(err);
+          }).join(', ');
+        }
+        return 'Invalid request. Please check your input.';
       case 401:
         return 'Unauthorized. Please log in again.';
       case 403:
         return 'You do not have permission to perform this action.';
       case 404:
-        return data?.detail && typeof data.detail === 'string'
-          ? data.detail 
-          : 'Resource not found.';
-      case 422:
-        // Validation error
-        if (data?.detail && Array.isArray(data.detail)) {
-          return data.detail.map((err) => err.msg).join(', ');
-        }
-        return 'Validation error. Please check your input.';
+        return 'Resource not found.';
+      case 405:
+        return 'Method not allowed.';
       case 500:
         return 'Server error. Please try again later.';
       default:
-        return data?.detail && typeof data.detail === 'string'
-          ? data.detail 
-          : `Error: ${status}`;
+        return `Error: ${status}`;
     }
   } else if (error.request) {
     // Request made but no response
@@ -197,20 +196,8 @@ export const bugApi = {
    * Create new bug
    */
   create: async (data: BugCreateRequest): Promise<BugResponse> => {
-    // Backend expects form data, not JSON
-    const formData = new FormData();
-    formData.append('title', data.title);
-    formData.append('description', data.description);
-    formData.append('projectId', data.projectId);
-    formData.append('reportedBy', data.reportedBy);
-    formData.append('priority', data.priority);
-    formData.append('severity', data.severity);
-    
-    const response = await apiClient.post<BugResponse>('/api/bugs', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // Next.js API routes expect JSON
+    const response = await apiClient.post<BugResponse>('/api/bugs', data);
     return transformDates(response.data);
   },
 
@@ -229,21 +216,17 @@ export const bugApi = {
    * Validate bug (tester only)
    */
   validate: async (id: string, userId: string, userRole: string = 'tester'): Promise<StatusUpdateResponse> => {
-    // Backend expects form data
-    const formData = new FormData();
-    formData.append('userId', userId);
-    formData.append('userRole', userRole);
-    
-    const response = await apiClient.patch<StatusUpdateResponse>(`/api/bugs/${id}/validate`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await apiClient.patch<StatusUpdateResponse>(`/api/bugs/${id}/validate`, {
+      userId,
+      userRole,
     });
     if (response.data.bug) {
       response.data.bug = transformDates(response.data.bug);
     }
     return response.data;
   },
+
+
 
   /**
    * Assign bug to user
@@ -271,7 +254,9 @@ export const commentApi = {
    * Get comments for a bug
    */
   getByBugId: async (bugId: string): Promise<Comment[]> => {
-    const response = await apiClient.get<Comment[]>(`/api/bugs/${bugId}/comments`);
+    const response = await apiClient.get<Comment[]>('/api/comments', {
+      params: { bugId },
+    });
     return response.data.map(transformDates);
   },
 };
@@ -320,7 +305,7 @@ export const activityLogApi = {
    * Get all activity logs
    */
   getAll: async (): Promise<ActivityLog[]> => {
-    const response = await apiClient.get<ActivityLog[]>('/api/activity-logs');
+    const response = await apiClient.get<ActivityLog[]>('/api/activities');
     return response.data.map(transformDates);
   },
 
@@ -328,7 +313,9 @@ export const activityLogApi = {
    * Get activity logs for a specific bug
    */
   getByBugId: async (bugId: string): Promise<ActivityLog[]> => {
-    const response = await apiClient.get<ActivityLog[]>(`/api/activity-logs/bug/${bugId}`);
+    const response = await apiClient.get<ActivityLog[]>('/api/activities', {
+      params: { bugId },
+    });
     return response.data.map(transformDates);
   },
 };

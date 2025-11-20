@@ -10,6 +10,7 @@ export enum ActivityAction {
   ASSIGNED = 'assigned',
   STATUS_CHANGED = 'status_changed',
   COMMENTED = 'commented',
+  VALIDATED = 'validated',
 }
 
 export interface Activity {

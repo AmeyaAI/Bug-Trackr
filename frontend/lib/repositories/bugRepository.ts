@@ -76,6 +76,7 @@ export class BugRepository {
     const now = new Date();
     const bugToCreate = {
       ...bugData,
+      validated: false,  // New bugs are not validated by default
       createdAt: now,
       updatedAt: now,
     };
