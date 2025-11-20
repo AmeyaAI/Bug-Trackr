@@ -53,15 +53,49 @@ async function handleGet(
 }
 
 /**
+ * POST /api/projects - Create a new project
+ * 
+ * Request Body: Project data
+ * Returns: Created project object
+ * Status Codes: 201 (created), 400 (validation error), 500 (server error)
+ */
+async function handlePost(
+  req: NextApiRequest,
+  res: NextApiResponse<Project | ErrorResponse>
+) {
+  try {
+    const services = getServiceContainer();
+    const projectRepo = services.getProjectRepository();
+    
+    logger.debug('Creating project', { data: req.body });
+    const project = await projectRepo.create(req.body);
+    
+    logger.info('Project created successfully', { projectId: project.id });
+    return res.status(201).json(project);
+    
+  } catch (error) {
+    logger.error('Error creating project', { error });
+    return res.status(500).json({
+      error: 'Failed to create project',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
  * Main API route handler
  * Routes requests to appropriate handler based on HTTP method
  */
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<ProjectsSuccessResponse | ErrorResponse>
+  res: NextApiResponse<ProjectsSuccessResponse | Project | ErrorResponse>
 ) {
   if (req.method === 'GET') {
     return handleGet(req, res);
+  }
+  
+  if (req.method === 'POST') {
+    return handlePost(req, res);
   }
   
   return res.status(405).json({

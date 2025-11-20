@@ -33,12 +33,12 @@ export enum UserRole {
 
 // Core entity interfaces
 export interface Bug {
-  _id: string;
+  id: string;  // Changed from _id to match new API
   title: string;
   description: string;
   projectId: string;
   reportedBy: string;
-  assignedTo?: string;
+  assignedTo?: string | null;
   status: BugStatus;
   priority: BugPriority;
   severity: BugSeverity;
@@ -49,7 +49,7 @@ export interface Bug {
 }
 
 export interface Comment {
-  _id: string;
+  id: string;  // Changed from _id to match new API
   bugId: string;
   authorId: string;
   message: string;
@@ -57,23 +57,24 @@ export interface Comment {
 }
 
 export interface Project {
-  _id: string;
+  id: string;  // Changed from _id to match new API
   name: string;
   description: string;
   createdBy: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface User {
-  _id: string;
+  id: string;  // Changed from _id to match new API
   name: string;
   email: string;
   role: string;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ActivityLog {
-  _id: string;
+  id: string;  // Changed from _id to match new API
   bugId: string;
   bugTitle: string;
   projectId: string;

@@ -80,7 +80,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
 
                 return (
                   <div
-                    key={comment._id}
+                    key={comment.id}
                     className="flex gap-3 pb-4 border-b last:border-b-0"
                   >
                     <Avatar className="size-8 mt-1">

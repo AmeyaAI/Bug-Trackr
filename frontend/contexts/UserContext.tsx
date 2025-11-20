@@ -48,7 +48,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           try {
             const parsed = JSON.parse(storedUser);
             // Validate that the stored user has required properties
-            if (parsed && parsed._id && parsed.name) {
+            if (parsed && parsed.id && parsed.name) {
               setCurrentUser(parsed);
             } else {
               // Invalid stored user, clear it

@@ -15,12 +15,12 @@ import { userApi } from '@/utils/apiClient';
 
 const createSampleBugs = (users: User[]): Bug[] => {
   // Use real user IDs from Collection DB if available
-  const userId2 = users[1]?._id || '2';
-  const userId3 = users[2]?._id || '3';
+  const userId2 = users[1]?.id || '2';
+  const userId3 = users[2]?.id || '3';
 
   return [
     {
-      _id: '1',
+      id: '1',
       title: 'Login button not responding on mobile',
       description: 'When users tap the login button on mobile devices, nothing happens. This issue only occurs on iOS Safari.',
       projectId: 'proj-1',
@@ -35,7 +35,7 @@ const createSampleBugs = (users: User[]): Bug[] => {
       updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
     },
     {
-      _id: '2',
+      id: '2',
       title: 'Dashboard charts not loading',
       description: 'The analytics dashboard shows a loading spinner indefinitely. Console shows CORS errors.',
       projectId: 'proj-1',
@@ -50,7 +50,7 @@ const createSampleBugs = (users: User[]): Bug[] => {
       updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
     },
     {
-      _id: '3',
+      id: '3',
       title: 'Typo in welcome email',
       description: 'The welcome email has "Welcom" instead of "Welcome" in the subject line.',
       projectId: 'proj-1',
@@ -67,26 +67,26 @@ const createSampleBugs = (users: User[]): Bug[] => {
 };
 
 const createSampleComments = (users: User[]): Comment[] => {
-  const userId2 = users[1]?._id || '2';
-  const userId3 = users[2]?._id || '3';
+  const userId2 = users[1]?.id || '2';
+  const userId3 = users[2]?.id || '3';
 
   return [
     {
-      _id: 'c1',
+      id: 'c1',
       bugId: '1',
       authorId: userId2,
       message: 'I can reproduce this on my iPhone 13. Looks like a touch event handler issue.',
       createdAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
     },
     {
-      _id: 'c2',
+      id: 'c2',
       bugId: '1',
       authorId: userId3,
       message: 'Also confirmed on iPad Pro. Android devices work fine.',
       createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     },
     {
-      _id: 'c3',
+      id: 'c3',
       bugId: '1',
       authorId: userId2,
       message: 'Working on a fix. Will have it ready by EOD.',
@@ -135,9 +135,9 @@ export default function ComponentsDemo() {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     const newComment: Comment = {
-      _id: `c${comments.length + 1}`,
+      id: `c${comments.length + 1}`,
       bugId,
-      authorId: selectedUser?._id || '1',
+      authorId: selectedUser?.id || '1',
       message,
       createdAt: new Date().toISOString(),
     };
@@ -156,7 +156,7 @@ export default function ComponentsDemo() {
   };
 
   const getUserName = (userId: string): string => {
-    return users.find(u => u._id === userId)?.name || 'Unknown User';
+    return users.find(u => u.id === userId)?.name || 'Unknown User';
   };
 
   if (!mounted) {
@@ -226,9 +226,9 @@ export default function ComponentsDemo() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {sampleBugs.map((bug) => (
               <BugCard
-                key={bug._id}
+                key={bug.id}
                 bug={bug}
-                commentCount={bug._id === '1' ? comments.length : Math.floor(Math.random() * 5)}
+                commentCount={bug.id === '1' ? comments.length : Math.floor(Math.random() * 5)}
                 assignedUserName={
                   bug.assignedTo ? getUserName(bug.assignedTo) : undefined
                 }

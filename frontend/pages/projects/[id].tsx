@@ -72,11 +72,11 @@ export default function ProjectBugsPage() {
       await Promise.all(
         projectBugs.map(async (bug) => {
           try {
-            const bugWithComments = await bugApi.getById(bug._id);
-            counts[bug._id] = bugWithComments.comments.length;
+            const bugWithComments = await bugApi.getById(bug.id);
+            counts[bug.id] = bugWithComments.comments.length;
           } catch (err) {
-            console.error(`Failed to load comments for bug ${bug._id}:`, err);
-            counts[bug._id] = 0;
+            console.error(`Failed to load comments for bug ${bug.id}:`, err);
+            counts[bug.id] = 0;
           }
         })
       );
@@ -309,9 +309,9 @@ export default function ProjectBugsPage() {
                 <tbody>
                   {filteredBugs.map((bug) => (
                     <tr 
-                      key={bug._id} 
+                      key={bug.id} 
                       className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                      onClick={() => handleViewDetails(bug._id)}
+                      onClick={() => handleViewDetails(bug.id)}
                     >
                       <td className="px-6 py-4">
                         <div className="font-medium text-foreground max-w-md truncate">{bug.title}</div>
@@ -362,7 +362,7 @@ export default function ProjectBugsPage() {
                           >
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                           </svg>
-                          <span>{commentCounts[bug._id] || 0}</span>
+                          <span>{commentCounts[bug.id] || 0}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">
