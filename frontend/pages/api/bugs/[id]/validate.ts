@@ -12,6 +12,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { getServiceContainer } from '@/lib/services/serviceContainer';
 import { UserRole } from '@/lib/models/user';
+import { BugStatus } from '@/lib/models/bug';
 import { logger } from '@/lib/utils/logger';
 import { ActivityAction } from '@/lib/models/activity';
 
@@ -97,13 +98,14 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
     if (bug.validated) {
       logger.info('Bug already validated', { bugId: id });
       return res.status(200).json({
+        success: true,
         message: 'Bug is already validated',
         bug,
       });
     }
     
     // Check if bug is in Resolved status
-    if (bug.status !== 'Resolved') {
+    if (bug.status !== BugStatus.RESOLVED) {
       logger.warn('Bug not in Resolved status', { bugId: id, status: bug.status });
       return res.status(400).json({
         error: 'Bug must be in Resolved status to be validated',
