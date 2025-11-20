@@ -104,8 +104,8 @@ export function formatRelativeTime(dateString: string): string {
  * @param users - Array of users to search
  * @returns User name or 'Unknown User'
  */
-export function getUserName(userId: string, users: Array<{ _id: string; name: string }>): string {
-  const user = users.find(u => u._id === userId);
+export function getUserName(userId: string, users: Array<{ id: string; name: string }>): string {
+  const user = users.find(u => u.id === userId);
   return user?.name || 'Unknown User';
 }
 
@@ -116,7 +116,7 @@ export function getUserName(userId: string, users: Array<{ _id: string; name: st
  * @param projects - Array of projects to search
  * @returns Project name or 'Unknown Project'
  */
-export function getProjectName(projectId: string, projects: Array<{ _id: string; name: string }>): string {
-  const project = projects.find(p => p._id === projectId);
+export function getProjectName(projectId: string, projects: Array<{ id: string; name: string }>): string {
+  const project = projects.find(p => p.id === projectId);
   return project?.name || 'Unknown Project';
 }
