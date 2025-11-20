@@ -72,11 +72,18 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     }
     
     // Sort activities by timestamp in descending order (most recent first)
-    const sortedActivities = activities.sort((a, b) => {
-      const timeA = new Date(a.timestamp).getTime();
-      const timeB = new Date(b.timestamp).getTime();
-      return timeB - timeA;
-    });
+    // Pre-compute timestamps to avoid repeated Date object creation during sort
+    const activitiesWithTime = activities.map(activity => ({
+      activity,
+      time: activity.timestamp instanceof Date 
+        ? activity.timestamp.getTime() 
+        : new Date(activity.timestamp).getTime()
+    }));
+    
+    // Sort by pre-computed time values (non-mutating)
+    const sortedActivities = activitiesWithTime
+      .sort((a, b) => b.time - a.time)
+      .map(item => item.activity);
     
     logger.info('Activities fetched successfully', { count: sortedActivities.length });
     return res.status(200).json(sortedActivities);
