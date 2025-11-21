@@ -63,14 +63,14 @@ export default async function handler(
     logger.debug('Fetching comments for bug', { bugId: id });
     const comments = await commentRepo.getByBug(id);
     
-    // Return bug with comments
-    const bugWithComments = {
-      ...bug,
+    // Return bug with comments in the expected structure
+    const response = {
+      bug,
       comments,
     };
     
     logger.info('Bug fetched successfully with comments', { bugId: id, commentCount: comments.length });
-    return res.status(200).json(bugWithComments);
+    return res.status(200).json(response);
     
   } catch (error) {
     logger.error('Error fetching bug', { error });

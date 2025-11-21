@@ -114,9 +114,15 @@ export interface CommentCreateRequest {
   message: string;
 }
 
+export interface ProjectCreateRequest {
+  name: string;
+  description: string;
+  createdBy: string;
+}
+
 // API Response types
 export interface BugResponse {
-  _id: string;
+  id: string;
   title: string;
   description: string;
   projectId: string;
@@ -132,7 +138,7 @@ export interface BugResponse {
 }
 
 export interface CommentResponse {
-  _id: string;
+  id: string;
   bugId: string;
   authorId: string;
   message: string;
@@ -140,7 +146,7 @@ export interface CommentResponse {
 }
 
 export interface ProjectResponse {
-  _id: string;
+  id: string;
   name: string;
   description: string;
   createdBy: string;

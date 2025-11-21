@@ -14,6 +14,7 @@ import type {
   BugStatusUpdateRequest,
   BugAssignRequest,
   CommentCreateRequest,
+  ProjectCreateRequest,
   BugWithCommentsResponse,
   StatusUpdateResponse,
   AssignmentResponse,
@@ -268,6 +269,14 @@ export const projectApi = {
   getAll: async (): Promise<Project[]> => {
     const response = await apiClient.get<Project[]>('/api/projects');
     return response.data.map(transformDates);
+  },
+
+  /**
+   * Create new project
+   */
+  create: async (data: ProjectCreateRequest): Promise<ProjectResponse> => {
+    const response = await apiClient.post<ProjectResponse>('/api/projects', data);
+    return transformDates(response.data);
   },
 
   /**

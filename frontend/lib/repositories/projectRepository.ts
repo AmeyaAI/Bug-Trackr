@@ -19,6 +19,62 @@ import { logger } from '../utils/logger';
 const COLLECTION_PLURAL = 'bug_tracking_projects';
 const COLLECTION_SINGULAR = 'bug_tracking_project';
 
+/**
+ * Transforms project data for Collection DB storage
+ * Ensures relational fields are stored as arrays
+ */
+function transformProjectForStorage(project: Partial<Project>): Record<string, unknown> {
+  const { createdBy, ...rest } = project;
+  
+  const storageData: Record<string, unknown> = { ...rest };
+
+  if (createdBy !== undefined) {
+    storageData.createdBy = [createdBy];
+  }
+
+  return storageData;
+}
+
+/**
+ * Transforms project data from Collection DB
+ * Extracts relational fields from arrays to single values
+ * Handles both camelCase and snake_case keys for robustness
+ */
+function transformProjectFromStorage(project: Record<string, unknown>): Project {
+  // Helper to extract single value from array or value
+  const extractSingle = (val: unknown) => {
+    if (Array.isArray(val)) {
+      return val.length > 0 ? val[0] : undefined;
+    }
+    // Handle stringified array case
+    if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(val.replace(/'/g, '"'));
+        if (Array.isArray(parsed)) {
+          return parsed.length > 0 ? parsed[0] : undefined;
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+    return val;
+  };
+
+  const id = (project.id || project._id || project.__auto_id__) as string;
+  const name = (project.name || '') as string;
+  const description = (project.description || '') as string;
+  
+  const createdByRaw = project.createdBy || project.created_by;
+  const createdBy = extractSingle(createdByRaw) as string;
+
+  return {
+    id,
+    name,
+    description,
+    createdBy,
+  };
+}
+
 export class ProjectRepository {
   constructor(private readonly collectionDb: CollectionDBService) {}
 
@@ -31,13 +87,17 @@ export class ProjectRepository {
   async create(projectData: CreateProjectInput): Promise<Project> {
     logger.debug('Creating project', { name: projectData.name });
 
-    const createdProject = await this.collectionDb.createItem<Project>(
+    const storageData = transformProjectForStorage(projectData);
+
+    const createdProject = await this.collectionDb.createItem<Record<string, unknown>>(
       COLLECTION_PLURAL,
-      projectData
+      storageData
     );
 
-    logger.info('Project created successfully', { id: createdProject.id, name: createdProject.name });
-    return createdProject;
+    const project = transformProjectFromStorage(createdProject);
+
+    logger.info('Project created successfully', { id: project.id, name: project.name });
+    return project;
   }
 
   /**
@@ -48,13 +108,15 @@ export class ProjectRepository {
   async getAll(): Promise<Project[]> {
     logger.debug('Fetching all projects');
 
-    const projects = await this.collectionDb.getAllItems<Project>(COLLECTION_PLURAL, {
+    const projects = await this.collectionDb.getAllItems<Record<string, unknown>>(COLLECTION_PLURAL, {
       includeDetail: false, // Faster queries
       pageSize: 1000,
     });
 
-    logger.info('Projects fetched successfully', { count: projects.length });
-    return projects;
+    const transformedProjects = projects.map(transformProjectFromStorage);
+
+    logger.info('Projects fetched successfully', { count: transformedProjects.length });
+    return transformedProjects;
   }
 
   /**
@@ -66,18 +128,18 @@ export class ProjectRepository {
   async getById(projectId: string): Promise<Project | null> {
     logger.debug('Fetching project by ID', { projectId });
 
-    const project = await this.collectionDb.getItemById<Project>(
+    const project = await this.collectionDb.getItemById<Record<string, unknown>>(
       COLLECTION_SINGULAR,
       projectId
     );
 
     if (project) {
       logger.info('Project fetched successfully', { projectId });
+      return transformProjectFromStorage(project);
     } else {
       logger.debug('Project not found', { projectId });
+      return null;
     }
-
-    return project;
   }
 
   /**
@@ -90,14 +152,20 @@ export class ProjectRepository {
   async update(projectId: string, updates: UpdateProjectInput): Promise<Project> {
     logger.debug('Updating project', { projectId, updates });
 
-    const updatedProject = await this.collectionDb.updateItem<Project>(
+    // updates doesn't contain createdBy, so no need to transform for storage
+    // but we should be consistent
+    const storageUpdates = transformProjectForStorage(updates as Partial<Project>);
+
+    const updatedProject = await this.collectionDb.updateItem<Record<string, unknown>>(
       COLLECTION_SINGULAR,
       projectId,
-      updates
+      storageUpdates
     );
 
+    const project = transformProjectFromStorage(updatedProject);
+
     logger.info('Project updated successfully', { projectId });
-    return updatedProject;
+    return project;
   }
 
   /**

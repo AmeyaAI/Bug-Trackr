@@ -89,10 +89,7 @@ export class CollectionDBService {
     this.apiKey = apiKey.trim();
     this.timeout = timeout;
 
-    logger.info('CollectionDBService initialized', {
-      baseUrl: this.baseUrl,
-      timeout: this.timeout,
-    });
+    logger.info('CollectionDBService initialized');
   }
 
   /**
@@ -214,15 +211,6 @@ export class CollectionDBService {
     
     // Handle ID injection with conflict detection
     if (autoId) {
-      // Check for existing ID that differs from __auto_id__
-      if (camelCaseData.id && camelCaseData.id !== autoId) {
-        logger.warn('ID conflict detected in Collection DB response', {
-          existingId: camelCaseData.id,
-          autoId: autoId,
-          resolution: 'Using __auto_id__ as authoritative source',
-        });
-      }
-      
       // Always use __auto_id__ as the authoritative ID
       return { ...camelCaseData, id: autoId } as T;
     }

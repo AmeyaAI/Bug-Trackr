@@ -19,6 +19,83 @@ import { logger } from '../utils/logger';
 const COLLECTION_PLURAL = 'bug_tracking_activitiess';
 const COLLECTION_SINGULAR = 'bug_tracking_activities';
 
+/**
+ * Transforms activity data for Collection DB storage
+ * Ensures relational fields are stored as arrays
+ */
+function transformActivityForStorage(activity: Partial<Activity>): Record<string, unknown> {
+  const { bugId, authorId, ...rest } = activity;
+  
+  const storageData: Record<string, unknown> = { ...rest };
+
+  if (bugId !== undefined) {
+    storageData.bugId = [bugId];
+  }
+
+  if (authorId !== undefined) {
+    storageData.authorId = [authorId];
+  }
+
+  return storageData;
+}
+
+/**
+ * Transforms activity data from Collection DB
+ * Extracts relational fields from arrays to single values
+ * Handles both camelCase and snake_case keys for robustness
+ */
+function transformActivityFromStorage(activity: Record<string, unknown>): Activity {
+  // Helper to extract single value from array or value
+  const extractSingle = (val: unknown) => {
+    if (Array.isArray(val)) {
+      return val.length > 0 ? val[0] : undefined;
+    }
+    // Handle stringified array case
+    if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(val.replace(/'/g, '"'));
+        if (Array.isArray(parsed)) {
+          return parsed.length > 0 ? parsed[0] : undefined;
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+    return val;
+  };
+
+  // Helper to parse date from string, number, or Date
+  const parseDate = (val: unknown): Date => {
+    if (!val) return new Date();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? new Date() : d;
+    }
+    return new Date();
+  };
+
+  const id = (activity.id || activity._id || activity.__auto_id__) as string;
+  const action = (activity.action || 'reported') as ActivityAction; // Default to reported if missing
+  
+  const bugIdRaw = activity.bugId || activity.bug_id;
+  const authorIdRaw = activity.authorId || activity.author_id;
+  
+  const bugId = extractSingle(bugIdRaw) as string;
+  const authorId = extractSingle(authorIdRaw) as string;
+  
+  const timestampRaw = activity.timestamp || activity.created_at || activity.created;
+  const timestamp = parseDate(timestampRaw);
+
+  return {
+    id,
+    bugId,
+    action,
+    authorId,
+    timestamp,
+  };
+}
+
 export class ActivityRepository {
   constructor(private readonly collectionDb: CollectionDBService) {}
 
@@ -37,17 +114,21 @@ export class ActivityRepository {
       timestamp: new Date(),
     };
 
-    const createdActivity = await this.collectionDb.createItem<Activity>(
+    const storageData = transformActivityForStorage(activityToCreate);
+
+    const createdActivity = await this.collectionDb.createItem<Record<string, unknown>>(
       COLLECTION_PLURAL,
-      activityToCreate
+      storageData
     );
 
+    const activity = transformActivityFromStorage(createdActivity);
+
     logger.info('Activity created successfully', { 
-      id: createdActivity.id, 
-      bugId: createdActivity.bugId,
-      action: createdActivity.action 
+      id: activity.id, 
+      bugId: activity.bugId,
+      action: activity.action 
     });
-    return createdActivity;
+    return activity;
   }
 
   /**
@@ -59,13 +140,15 @@ export class ActivityRepository {
   async getAll(): Promise<Activity[]> {
     logger.debug('Fetching all activities');
 
-    const activities = await this.collectionDb.getAllItems<Activity>(COLLECTION_PLURAL, {
+    const activities = await this.collectionDb.getAllItems<Record<string, unknown>>(COLLECTION_PLURAL, {
       includeDetail: false,
       pageSize: 1000,
     });
 
-    logger.info('Activities fetched successfully', { count: activities.length });
-    return activities;
+    const transformedActivities = activities.map(transformActivityFromStorage);
+
+    logger.info('Activities fetched successfully', { count: transformedActivities.length });
+    return transformedActivities;
   }
 
   /**
@@ -78,18 +161,18 @@ export class ActivityRepository {
   async getById(activityId: string): Promise<Activity | null> {
     logger.debug('Fetching activity by ID', { activityId });
 
-    const activity = await this.collectionDb.getItemById<Activity>(
+    const activity = await this.collectionDb.getItemById<Record<string, unknown>>(
       COLLECTION_SINGULAR,
       activityId
     );
 
     if (activity) {
       logger.info('Activity fetched successfully', { activityId });
+      return transformActivityFromStorage(activity);
     } else {
       logger.debug('Activity not found', { activityId });
+      return null;
     }
-
-    return activity;
   }
 
   /**
@@ -102,13 +185,13 @@ export class ActivityRepository {
   async getByBug(bugId: string): Promise<Activity[]> {
     logger.debug('Fetching activities by bug', { bugId });
 
-    const activities = await this.collectionDb.queryItems<Activity>(
+    const activities = await this.collectionDb.queryItems<Record<string, unknown>>(
       COLLECTION_PLURAL,
       [
         {
           field_name: 'payload.bug_id',
           field_value: bugId,
-          operator: 'eq',
+          operator: 'contains',
         },
       ],
       {
@@ -117,8 +200,10 @@ export class ActivityRepository {
       }
     );
 
-    logger.info('Activities fetched by bug successfully', { bugId, count: activities.length });
-    return activities;
+    const transformedActivities = activities.map(transformActivityFromStorage);
+
+    logger.info('Activities fetched by bug successfully', { bugId, count: transformedActivities.length });
+    return transformedActivities;
   }
 
   /**
@@ -131,12 +216,14 @@ export class ActivityRepository {
   async getRecent(limit: number): Promise<Activity[]> {
     logger.debug('Fetching recent activities', { limit });
 
-    const activities = await this.collectionDb.getAllItems<Activity>(COLLECTION_PLURAL, {
+    const activities = await this.collectionDb.getAllItems<Record<string, unknown>>(COLLECTION_PLURAL, {
       includeDetail: false,
       pageSize: Math.min(limit, 1000),
     });
 
-    logger.info('Recent activities fetched successfully', { count: activities.length, limit });
-    return activities;
+    const transformedActivities = activities.map(transformActivityFromStorage);
+
+    logger.info('Recent activities fetched successfully', { count: transformedActivities.length, limit });
+    return transformedActivities;
   }
 }

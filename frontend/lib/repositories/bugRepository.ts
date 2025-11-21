@@ -41,24 +41,111 @@ function tagsFromString(tagsStr: string): BugTag[] {
 
 /**
  * Transforms bug data for Collection DB storage (tags array → string)
+ * Also ensures relational fields are stored as arrays
  */
 function transformBugForStorage(bug: Partial<Bug>): Record<string, unknown> {
-  const { tags, ...rest } = bug;
-  return {
+  const { tags, projectId, reportedBy, assignedTo, ...rest } = bug;
+  
+  const storageData: Record<string, unknown> = {
     ...rest,
     tags: tags ? tagsToString(tags) : '',
   };
+
+  if (projectId !== undefined) {
+    storageData.projectId = [projectId];
+  }
+
+  if (reportedBy !== undefined) {
+    storageData.reportedBy = [reportedBy];
+  }
+
+  if (assignedTo !== undefined) {
+    storageData.assignedTo = assignedTo ? [assignedTo] : [];
+  }
+
+  return storageData;
 }
 
 /**
  * Transforms bug data from Collection DB (tags string → array)
+ * Also extracts relational fields from arrays to single values
+ * Handles both camelCase and snake_case keys for robustness
  */
 function transformBugFromStorage(bug: Record<string, unknown>): Bug {
-  const { tags, ...rest } = bug;
+  // Helper to extract single value from array or value
+  const extractSingle = (val: unknown) => {
+    if (Array.isArray(val)) {
+      return val.length > 0 ? val[0] : undefined;
+    }
+    // Handle stringified array case: "['uuid']" or '["uuid"]'
+    if (typeof val === 'string' && val.startsWith('[') && val.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(val.replace(/'/g, '"')); // Handle single quotes if necessary
+        if (Array.isArray(parsed)) {
+          return parsed.length > 0 ? parsed[0] : undefined;
+        }
+      } catch (e) {
+        // Not valid JSON, treat as string
+      }
+    }
+    return val;
+  };
+
+  // Helper to parse date from string, number, or Date
+  const parseDate = (val: unknown): Date => {
+    if (!val) return new Date(); // Default to now if missing, or handle as invalid?
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? new Date() : d;
+    }
+    return new Date();
+  };
+
+  // Explicitly map all fields to ensure correctness
+  const id = (bug.id || bug._id || bug.__auto_id__) as string;
+  const title = (bug.title || '') as string;
+  const description = (bug.description || '') as string;
+  const status = (bug.status || BugStatus.OPEN) as BugStatus;
+  const priority = (bug.priority || BugPriority.MEDIUM) as BugPriority;
+  const severity = (bug.severity || BugSeverity.MINOR) as BugSeverity;
+  
+  const projectIdRaw = bug.projectId || bug.project_id;
+  const reportedByRaw = bug.reportedBy || bug.reported_by;
+  const assignedToRaw = bug.assignedTo || bug.assigned_to;
+  
+  const projectId = extractSingle(projectIdRaw) as string;
+  const reportedBy = extractSingle(reportedByRaw) as string;
+  const assignedTo = extractSingle(assignedToRaw) as string | null;
+  
+  const attachments = (bug.attachments || '') as string;
+  const tagsRaw = bug.tags;
+  const tags = typeof tagsRaw === 'string' ? tagsFromString(tagsRaw) : [];
+  
+  const validated = !!bug.validated;
+  
+  const createdAtRaw = bug.createdAt || bug.created_at || bug.created;
+  const updatedAtRaw = bug.updatedAt || bug.updated_at || bug.updated;
+  
+  const createdAt = parseDate(createdAtRaw);
+  const updatedAt = parseDate(updatedAtRaw);
+
   return {
-    ...rest,
-    tags: typeof tags === 'string' ? tagsFromString(tags) : [],
-  } as Bug;
+    id,
+    title,
+    description,
+    status,
+    priority,
+    severity,
+    projectId,
+    reportedBy,
+    assignedTo,
+    attachments,
+    tags,
+    validated,
+    createdAt,
+    updatedAt,
+  };
 }
 
 export class BugRepository {
@@ -158,7 +245,7 @@ export class BugRepository {
         {
           field_name: 'payload.project_id',
           field_value: projectId,
-          operator: 'eq',
+          operator: 'contains',
         },
       ],
       {
@@ -190,7 +277,7 @@ export class BugRepository {
         {
           field_name: 'payload.assigned_to',
           field_value: assigneeId,
-          operator: 'eq',
+          operator: 'contains',
         },
       ],
       {

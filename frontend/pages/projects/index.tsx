@@ -114,8 +114,8 @@ export default function ProjectsPage() {
               View and manage bugs organized by project
             </p>
           </div>
-          <Button onClick={() => router.push('/bugs')}>
-            View All Bugs
+          <Button onClick={() => router.push('/projects/new')}>
+            Create Project
           </Button>
         </div>
 

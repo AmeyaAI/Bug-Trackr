@@ -111,14 +111,14 @@ export default function NewBugPage() {
         title: data.title,
         description: data.description,
         projectId: data.projectId,
-        reportedBy: currentUser._id,
+        reportedBy: currentUser.id,
         priority: data.priority,
         severity: data.severity,
       });
 
       toast.success("Bug created successfully!");
       // Navigate to the newly created bug
-      router.push(`/bugs/${newBug._id}`);
+      router.push(`/bugs/${newBug.id}`);
     } catch (err) {
       console.error("Failed to create bug:", err);
       const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
@@ -235,7 +235,7 @@ export default function NewBugPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {projects.map((project) => (
-                      <SelectItem key={project._id} value={project._id}>
+                      <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
                     ))}

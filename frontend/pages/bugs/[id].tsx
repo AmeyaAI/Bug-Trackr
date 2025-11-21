@@ -78,8 +78,15 @@ export default function BugDetailsPage() {
       setUsers(usersData);
       
       // Load project details
-      const projectData = await projectApi.getById(bugData.bug.projectId);
-      setProject(projectData);
+      if (bugData.bug.projectId) {
+        try {
+          const projectData = await projectApi.getById(bugData.bug.projectId);
+          setProject(projectData);
+        } catch (err) {
+          console.warn('Failed to load project details:', err);
+          // Don't fail the whole page load if project fails
+        }
+      }
       
       // Find reported by and assigned users
       const reporter = usersData.find(u => u.id === bugData.bug.reportedBy);

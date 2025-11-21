@@ -17,6 +17,7 @@ package-lock.json
 *.swp
 *.swo
 .kiro/
+.github/
 
 # OS
 .DS_Store
