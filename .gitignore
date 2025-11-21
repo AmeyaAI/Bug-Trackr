@@ -1,9 +1,5 @@
 # Dependencies
 node_modules/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
 
 # Environment variables
 .env
@@ -14,11 +10,6 @@ __pycache__/
 frontend/.next/
 frontend/out/
 package-lock.json
-
-# Python
-backend/*.egg-info/
-backend/dist/
-backend/build/
 
 # IDE
 .vscode/
