@@ -25,6 +25,7 @@ import { getInitials } from "@/lib/utils";
 import { useUser, usePermission } from "@/contexts/UserContext";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
+import { TagBadge } from "@/components/TagBadge";
 import { getStatusBadgeVariant, getPriorityBadgeVariant } from "@/utils/badgeHelpers";
 
 interface BugCardProps {
@@ -118,6 +119,15 @@ export const BugCard: React.FC<BugCardProps> = ({
             </Badge>
           )}
         </div>
+
+        {/* Tags */}
+        {bug.tags && bug.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {bug.tags.map((tag) => (
+              <TagBadge key={tag} tag={tag} />
+            ))}
+          </div>
+        )}
 
         {/* Assignment info */}
         {bug.assignedTo && (

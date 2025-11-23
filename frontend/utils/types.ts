@@ -3,6 +3,8 @@
  * These types ensure type safety for API communication
  */
 
+import { BugTag } from '@/lib/models/bug';
+
 // Enums matching backend
 export enum BugStatus {
   OPEN = "Open",
@@ -42,7 +44,7 @@ export interface Bug {
   status: BugStatus;
   priority: BugPriority;
   severity: BugSeverity;
-  tags: string[];
+  tags: BugTag[];
   validated: boolean;
   createdAt: string;
   updatedAt: string;
@@ -95,6 +97,7 @@ export interface BugCreateRequest {
   reportedBy: string;
   priority: BugPriority;
   severity: BugSeverity;
+  tags: BugTag[];
 }
 
 export interface BugStatusUpdateRequest {
@@ -131,7 +134,7 @@ export interface BugResponse {
   status: BugStatus;
   priority: BugPriority;
   severity: BugSeverity;
-  tags: string[];
+  tags: BugTag[];
   validated: boolean;
   createdAt: string;
   updatedAt: string;

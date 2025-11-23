@@ -180,6 +180,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       assignedTo: body.assignedTo || null,
       attachments: body.attachments ? body.attachments.join(',') : '',
       tags: body.tags || [],
+      validated: false,
     });
     
     // Log "reported" activity

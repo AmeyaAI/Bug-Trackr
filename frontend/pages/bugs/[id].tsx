@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PriorityIcon } from '@/components/PriorityIcon';
 import { SeverityIcon } from '@/components/SeverityIcon';
+import { TagBadge } from '@/components/TagBadge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
   Select,
@@ -306,6 +307,18 @@ export default function BugDetailsPage() {
                   )}
                 </div>
               </div>
+              
+              {/* Tags section */}
+              {bug.tags && bug.tags.length > 0 && (
+                <div className="flex items-start gap-2 mt-4">
+                  <span className="text-muted-foreground font-medium text-sm">Tags:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {bug.tags.map((tag) => (
+                      <TagBadge key={tag} tag={tag} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </CardHeader>
 

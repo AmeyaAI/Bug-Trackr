@@ -29,10 +29,12 @@ import {
 } from "@/components/ui/card";
 import { bugApi, projectApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
 import { BugPriority, BugSeverity, Project } from "@/utils/types";
+import { BugTag, ALL_BUG_TAGS } from "@/lib/models/bug";
 import { useUser } from "@/contexts/UserContext";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
+import { TagBadge } from "@/components/TagBadge";
 import { useToast } from "@/contexts/ToastContext";
 import { AxiosError } from "axios";
 
@@ -42,6 +44,7 @@ interface BugFormData {
   projectId: string;
   priority: BugPriority;
   severity: BugSeverity;
+  tags: BugTag[];
 }
 
 export default function NewBugPage() {
@@ -66,12 +69,14 @@ export default function NewBugPage() {
       projectId: "",
       priority: BugPriority.MEDIUM,
       severity: BugSeverity.MAJOR,
+      tags: [],
     },
   });
 
   const selectedProjectId = watch("projectId");
   const selectedPriority = watch("priority");
   const selectedSeverity = watch("severity");
+  const selectedTags = watch("tags");
 
   const loadProjects = useCallback(async () => {
     setIsLoadingProjects(true);
@@ -114,6 +119,7 @@ export default function NewBugPage() {
         reportedBy: currentUser.id,
         priority: data.priority,
         severity: data.severity,
+        tags: data.tags,
       });
 
       toast.success("Bug created successfully!");
@@ -341,6 +347,105 @@ export default function NewBugPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Tags multi-select */}
+              <div className="space-y-2">
+                <Label htmlFor="tags">
+                  Tags <span className="text-destructive">*</span>
+                </Label>
+                <div className="border rounded-lg p-4 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {ALL_BUG_TAGS.map((tag) => {
+                      const isSelected = selectedTags.includes(tag);
+                      
+                      // Get color scheme for each tag type
+                      const getTagButtonStyles = (tagType: BugTag, selected: boolean) => {
+                        const baseStyles = "rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-in-out hover:shadow-sm border-2";
+                        
+                        if (selected) {
+                          switch (tagType) {
+                            case BugTag.EPIC:
+                              return `${baseStyles} bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700`;
+                            case BugTag.TASK:
+                              return `${baseStyles} bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700`;
+                            case BugTag.SUGGESTION:
+                              return `${baseStyles} bg-green-50 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700`;
+                            case BugTag.BUG_FRONTEND:
+                              return `${baseStyles} bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700`;
+                            case BugTag.BUG_BACKEND:
+                              return `${baseStyles} bg-red-50 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700`;
+                            case BugTag.BUG_TEST:
+                              return `${baseStyles} bg-indigo-50 text-indigo-700 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700`;
+                            default:
+                              return `${baseStyles} bg-gray-50 text-gray-700 border-gray-300 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-700`;
+                          }
+                        } else {
+                          // Unselected state - subtle hint of color
+                          switch (tagType) {
+                            case BugTag.EPIC:
+                              return `${baseStyles} bg-background text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/20`;
+                            case BugTag.TASK:
+                              return `${baseStyles} bg-background text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/20`;
+                            case BugTag.SUGGESTION:
+                              return `${baseStyles} bg-background text-green-600 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/20`;
+                            case BugTag.BUG_FRONTEND:
+                              return `${baseStyles} bg-background text-amber-600 border-amber-200 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/20`;
+                            case BugTag.BUG_BACKEND:
+                              return `${baseStyles} bg-background text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20`;
+                            case BugTag.BUG_TEST:
+                              return `${baseStyles} bg-background text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-800 dark:hover:bg-indigo-900/20`;
+                            default:
+                              return `${baseStyles} bg-background text-gray-600 border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:border-gray-800 dark:hover:bg-gray-900/20`;
+                          }
+                        }
+                      };
+                      
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            const newTags = isSelected
+                              ? selectedTags.filter(t => t !== tag)
+                              : [...selectedTags, tag];
+                            setValue("tags", newTags);
+                          }}
+                          className={getTagButtonStyles(tag, isSelected)}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Selected tags preview */}
+                  {selectedTags.length > 0 && (
+                    <div className="pt-3 border-t">
+                      <p className="text-sm text-muted-foreground mb-2">Selected tags:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedTags.map((tag) => (
+                          <TagBadge key={tag} tag={tag} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedTags.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">Please select at least one tag</p>
+                  )}
+                </div>
+                <input
+                  type="hidden"
+                  {...register("tags", {
+                    validate: (value) => value.length > 0 || "At least one tag is required",
+                  })}
+                />
+                {errors.tags && (
+                  <p className="text-sm text-destructive">
+                    {errors.tags.message}
+                  </p>
+                )}
               </div>
 
               {/* Reported by (read-only) */}
