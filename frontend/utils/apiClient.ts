@@ -44,7 +44,7 @@ const notifyRequestListeners = () => {
 // API configuration - using relative paths for Next.js API routes
 // No baseURL needed since we're using relative paths (/api/*)
 const apiClient: AxiosInstance = axios.create({
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },

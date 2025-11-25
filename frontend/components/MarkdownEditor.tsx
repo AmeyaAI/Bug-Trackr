@@ -13,7 +13,7 @@
  * - Text size options
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
@@ -72,19 +72,42 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabMode>('write');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isPending, startTransition] = useTransition();
+  
+  // Local state for immediate feedback and to decouple from parent render cycle
+  const [localValue, setLocalValue] = useState(value);
+  // Ref to access latest value in callbacks without re-creating them
+  const valueRef = useRef(value);
+
+  // Sync local state with prop when it changes externally
+  React.useEffect(() => {
+    if (value !== localValue) {
+      setLocalValue(value);
+    }
+    valueRef.current = value;
+  }, [value, localValue]);
+
+  const handleChange = useCallback((newValue: string) => {
+    setLocalValue(newValue);
+    valueRef.current = newValue;
+    startTransition(() => {
+      onChange(newValue);
+    });
+  }, [onChange]);
 
   // Get current selection or insert at cursor
   const insertText = useCallback((before: string, after: string = '', placeholder: string = 'text') => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
+    const currentValue = valueRef.current;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selectedText = value.substring(start, end);
+    const selectedText = currentValue.substring(start, end);
     const textToInsert = selectedText || placeholder;
     
-    const newText = value.substring(0, start) + before + textToInsert + after + value.substring(end);
-    onChange(newText);
+    const newText = currentValue.substring(0, start) + before + textToInsert + after + currentValue.substring(end);
+    handleChange(newText);
 
     setTimeout(() => {
       // Select the inserted text so user can immediately type to replace placeholder
@@ -93,23 +116,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       textarea.focus();
       textarea.setSelectionRange(selectionStart, selectionEnd);
     }, 0);
-  }, [value, onChange]);
+  }, [handleChange]);
+
   // Insert text at line start
   const insertAtLineStart = useCallback((prefix: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
+    const currentValue = valueRef.current;
     const start = textarea.selectionStart;
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+    const lineStart = currentValue.lastIndexOf('\n', start - 1) + 1;
     
-    const newText = value.substring(0, lineStart) + prefix + value.substring(lineStart);
-    onChange(newText);
+    const newText = currentValue.substring(0, lineStart) + prefix + currentValue.substring(lineStart);
+    handleChange(newText);
 
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + prefix.length, start + prefix.length);
     }, 0);
-  }, [value, onChange]);
+  }, [handleChange]);
 
   // Formatting functions
   const formatBold = useCallback(() => insertText('**', '**', 'bold text'), [insertText]);
@@ -398,8 +423,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           {activeTab === 'write' ? (
             <Textarea
               ref={textareaRef}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
+              value={localValue}
+              onChange={(e) => handleChange(e.target.value)}
               placeholder={placeholder}
               disabled={disabled}
               className="min-h-[200px] border-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none rounded-none font-mono text-sm p-3"

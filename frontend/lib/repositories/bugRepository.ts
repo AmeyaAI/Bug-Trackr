@@ -116,7 +116,7 @@ function transformBugFromStorage(bug: Record<string, unknown>): Bug {
   
   const projectId = extractSingle(projectIdRaw) as string;
   const reportedBy = extractSingle(reportedByRaw) as string;
-  const assignedTo = extractSingle(assignedToRaw) as string | null;
+  const assignedTo = (extractSingle(assignedToRaw) as string) || null;
   
   const attachments = (bug.attachments || '') as string;
   const tagsRaw = bug.tags;

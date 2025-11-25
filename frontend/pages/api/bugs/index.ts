@@ -133,9 +133,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     // Validate request body
     const body = createBugSchema.parse(req.body);
     
-    // Verify project exists
-    logger.debug('Verifying project exists', { projectId: body.projectId });
-    const project = await projectRepo.getById(body.projectId);
+    // Verify project, reporter, and assignee (if provided) in parallel
+    logger.debug('Verifying project, reporter, and assignee existence');
+    
+    const [project, reporter, assignee] = await Promise.all([
+      projectRepo.getById(body.projectId),
+      userRepo.getById(body.reportedBy),
+      body.assignedTo ? userRepo.getById(body.assignedTo) : Promise.resolve(true)
+    ]);
+
     if (!project) {
       logger.warn('Project not found', { projectId: body.projectId });
       return res.status(404).json({
@@ -143,10 +149,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         details: `Project with ID ${body.projectId} does not exist`,
       });
     }
-    
-    // Verify reporter exists
-    logger.debug('Verifying reporter exists', { reportedBy: body.reportedBy });
-    const reporter = await userRepo.getById(body.reportedBy);
+
     if (!reporter) {
       logger.warn('Reporter user not found', { reportedBy: body.reportedBy });
       return res.status(404).json({
@@ -154,18 +157,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         details: `User with ID ${body.reportedBy} does not exist`,
       });
     }
-    
-    // Verify assignee exists if provided
-    if (body.assignedTo) {
-      logger.debug('Verifying assignee exists', { assignedTo: body.assignedTo });
-      const assignee = await userRepo.getById(body.assignedTo);
-      if (!assignee) {
-        logger.warn('Assignee user not found', { assignedTo: body.assignedTo });
-        return res.status(404).json({
-          error: 'Assignee user not found',
-          details: `User with ID ${body.assignedTo} does not exist`,
-        });
-      }
+
+    if (body.assignedTo && !assignee) {
+      logger.warn('Assignee user not found', { assignedTo: body.assignedTo });
+      return res.status(404).json({
+        error: 'Assignee user not found',
+        details: `User with ID ${body.assignedTo} does not exist`,
+      });
     }
     
     // Create bug with default values
