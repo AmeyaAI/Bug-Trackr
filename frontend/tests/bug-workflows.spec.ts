@@ -159,10 +159,10 @@ test.describe('Bug Workflows', () => {
 
     expect(response.status()).toBe(200);
     
-    const bug = await response.json();
-    expect(bug.id).toBe(createdBugId);
-    expect(bug).toHaveProperty('comments');
-    expect(Array.isArray(bug.comments)).toBeTruthy();
+    const data = await response.json();
+    expect(data.bug.id).toBe(createdBugId);
+    expect(data).toHaveProperty('comments');
+    expect(Array.isArray(data.comments)).toBeTruthy();
   });
 
   test('should update bug status as developer', async ({ request }) => {

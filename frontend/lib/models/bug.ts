@@ -5,6 +5,7 @@
 export enum BugStatus {
   OPEN = 'Open',
   IN_PROGRESS = 'In Progress',
+  IN_REVIEW = 'In Review',
   RESOLVED = 'Resolved',
   CLOSED = 'Closed',
 }
@@ -34,6 +35,13 @@ export enum BugTag {
   BUG_FRONTEND = 'Bug:Frontend',
   BUG_BACKEND = 'Bug:Backend',
   BUG_TEST = 'Bug:Test',
+  UI = 'UI',
+  MOBILE = 'Mobile',
+  BACKEND = 'Backend',
+  PAYMENT = 'Payment',
+  BROWSER = 'Browser',
+  PERFORMANCE = 'Performance',
+  DATABASE = 'Database',
 }
 
 /**
