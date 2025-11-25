@@ -96,6 +96,7 @@ export type KanbanCardProps<T extends KanbanItemProps = KanbanItemProps> = T & {
 export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   id,
   name,
+  column,
   children,
   className,
 }: KanbanCardProps<T>) => {

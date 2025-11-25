@@ -27,7 +27,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { ApiErrorFallback } from '@/components/ApiErrorFallback';
 import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName, getProjectName } from '@/utils/badgeHelpers';
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
-import { DragEndEvent } from '@dnd-kit/core';
+import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { LayoutGrid, List } from 'lucide-react';
 
 export default function BugsPage() {
@@ -45,6 +45,7 @@ export default function BugsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+  const [dragStartStatus, setDragStartStatus] = useState<BugStatus | null>(null);
 
   useEffect(() => {
     loadData();
@@ -99,17 +100,30 @@ export default function BugsPage() {
     { id: BugStatus.CLOSED, name: 'Closed' },
   ];
 
+  const handleKanbanDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const currentColumn = active.data.current?.column as BugStatus;
+    if (currentColumn) {
+      setDragStartStatus(currentColumn);
+    }
+  };
+
   const handleKanbanDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
-    if (!over) return;
+    if (!over) {
+      setDragStartStatus(null);
+      return;
+    }
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Get the original status from the drag event data
-    // This is crucial because optimistic updates might have already changed the local state
-    const oldStatus = active.data.current?.column as BugStatus;
+    // Get the original status from the drag start event
+    const oldStatus = dragStartStatus;
+    
+    // Reset drag start status
+    setDragStartStatus(null);
 
     // Find the bug that was moved
     const bug = bugs.find(b => b.id === activeId);
@@ -129,7 +143,7 @@ export default function BugsPage() {
       }
     }
 
-    // Compare with oldStatus from the event, not the potentially updated bug.status
+    // Compare with oldStatus from the start of the drag
     if (newStatus && oldStatus && newStatus !== oldStatus) {
       try {
         // Optimistic update is handled by onDataChange, but we need to ensure consistency
@@ -371,6 +385,7 @@ export default function BugsPage() {
                   return bug;
                 }));
               }}
+              onDragStart={handleKanbanDragStart}
               onDragEnd={handleKanbanDragEnd}
             >
               {(column) => (
