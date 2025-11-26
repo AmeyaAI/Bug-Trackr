@@ -127,6 +127,9 @@ export class CollectionDBService {
       // Enforce max page size of 1000
       const pageSize = Math.min(options.pageSize, 1000);
       params.append('page_size', pageSize.toString());
+      // Add aliases for compatibility with different backend conventions
+      params.append('limit', pageSize.toString());
+      params.append('pageSize', pageSize.toString());
     }
 
     if (options.lastEvaluatedKey !== undefined && options.lastEvaluatedKey !== null) {
@@ -377,6 +380,77 @@ export class CollectionDBService {
   }
 
   /**
+   * Retrieves items from a collection with pagination info
+   * @param collectionPlural - Plural collection name
+   * @param options - Query options for filtering and pagination
+   * @returns Object containing items and lastEvaluatedKey
+   */
+  async getAllItemsPaginated<T>(collectionPlural: string, options?: QueryOptions): Promise<{ items: T[], lastEvaluatedKey: Record<string, unknown> | null }> {
+    const params = this.buildQueryParams(options);
+    const url = `${this.buildListUrl(collectionPlural)}?${params.toString()}`;
+    
+    logger.debug('Fetching paginated items', { collection: collectionPlural, options });
+
+    const response = await this.makeRequest(url, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      await this.handleErrorResponse(response, 'fetch items', collectionPlural);
+    }
+
+    const result = await response.json();
+    
+    let items: unknown[] = [];
+    let lastEvaluatedKey: Record<string, unknown> | null = null;
+    
+    if (Array.isArray(result)) {
+      // Direct array response
+      items = result;
+    } else if (result && typeof result === 'object') {
+      // Extract last_evaluated_key
+      if (result.last_evaluated_key) {
+        lastEvaluatedKey = result.last_evaluated_key as Record<string, unknown>;
+      }
+
+      // Find the UUID key that contains the items array
+      const keys = Object.keys(result);
+      for (const key of keys) {
+        // Skip known metadata keys
+        if (key === 'Collection' || key === 'last_evaluated_key' || key === 'published_collections_detail') {
+          continue;
+        }
+        // Check if this key contains an array (the actual items)
+        if (Array.isArray(result[key])) {
+          items = result[key];
+          logger.debug('Found items in UUID key', { 
+            collection: collectionPlural, 
+            uuidKey: key,
+            count: items.length 
+          });
+          break;
+        }
+      }
+      
+      // Fallback to items property if no UUID key found
+      if (items.length === 0 && result.items) {
+        items = result.items;
+      }
+    }
+    
+    logger.info('Items fetched successfully', {
+      collection: collectionPlural,
+      count: items.length,
+      hasMore: !!lastEvaluatedKey
+    });
+
+    return {
+      items: items.map((item: unknown) => this.parseResponse<T>(item as CollectionDBResponse<unknown>)),
+      lastEvaluatedKey
+    };
+  }
+
+  /**
    * Retrieves a single item by ID
    * @param collectionSingular - Singular collection name
    * @param id - Item ID
@@ -580,6 +654,37 @@ export class CollectionDBService {
     });
 
     return this.getAllItems<T>(collectionPlural, queryOptions);
+  }
+
+  /**
+   * Queries items with filter support and pagination
+   * @param collectionPlural - Plural collection name
+   * @param filter - Array of filter queries
+   * @param options - Additional query options
+   * @returns Object containing items and lastEvaluatedKey
+   */
+  async queryItemsPaginated<T>(
+    collectionPlural: string,
+    filter: FilterQuery[],
+    options?: Omit<QueryOptions, 'filter'>
+  ): Promise<{ items: T[], lastEvaluatedKey: Record<string, unknown> | null }> {
+    if (!filter || filter.length === 0) {
+      return this.getAllItemsPaginated<T>(collectionPlural, options);
+    }
+
+    // Merge filter into options
+    const queryOptions: QueryOptions = {
+      ...options,
+      filter,
+    };
+
+    logger.debug('Querying paginated items with filter', {
+      collection: collectionPlural,
+      filter,
+      options,
+    });
+
+    return this.getAllItemsPaginated<T>(collectionPlural, queryOptions);
   }
 
   /**

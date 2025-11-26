@@ -31,7 +31,8 @@ if (!TOKEN) {
 }
 
 const headers = {
-  'Authorization': TOKEN
+  'Authorization': TOKEN,
+  'Content-Type': 'application/json'
 };
 
 async function deleteBugs() {
@@ -71,14 +72,52 @@ async function deleteBugs() {
         continue;
       }
 
-      console.log(`Deleting bug ${itemId}...`);
+      console.log(`Processing bug ${itemId}...`);
+
+      // Step 1: Update RelativeFields to remove relationships
       try {
-        await axios.delete(`${DELETE_URL_PREFIX}/${itemId}`, { headers });
-        console.log(`Successfully deleted bug ${itemId}`);
+        console.log(`  - Removing relative fields for ${itemId}...`);
+        const updatePayload = {
+            "id": itemId,
+            "fields": [
+                {
+                    "path": "$.project_id",
+                    "value": []
+                },
+                {
+                    "path": "$.reported_by",
+                    "value": []
+                },
+                {
+                    "path": "$.assigned_to",
+                    "value": []
+                },
+                {
+                    "path": "$.bug_tracking_activitiess",
+                    "value": []
+                }
+            ]
+        };
+        
+        await axios.put(`${DELETE_URL_PREFIX}/${itemId}`, updatePayload, { headers });
+        console.log(`  - Relative fields removed.`);
       } catch (error) {
-        console.error(`Failed to delete bug ${itemId}:`, error.message);
+         console.error(`  - Failed to update bug ${itemId}:`, error.message);
+         if (error.response) {
+             console.error('    Response:', error.response.status, error.response.data);
+         }
+         // We continue to try deleting even if update failed, though it might fail too.
+      }
+
+      // Step 2: Delete the bug
+      try {
+        console.log(`  - Deleting bug ${itemId}...`);
+        await axios.delete(`${DELETE_URL_PREFIX}/${itemId}`, { headers });
+        console.log(`  - Successfully deleted bug ${itemId}`);
+      } catch (error) {
+        console.error(`  - Failed to delete bug ${itemId}:`, error.message);
         if (error.response) {
-            console.error('Response:', error.response.status, error.response.data);
+            console.error('    Response:', error.response.status, error.response.data);
         }
       }
     }

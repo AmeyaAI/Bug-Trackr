@@ -7,18 +7,11 @@
  * Requirements: 2.1, 5.2
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PriorityIcon } from '@/components/PriorityIcon';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { bugApi, userApi, projectApi } from '@/utils/apiClient';
 import { Bug, BugStatus, BugPriority, User, Project, UserRole } from '@/utils/types';
@@ -28,7 +21,24 @@ import { ApiErrorFallback } from '@/components/ApiErrorFallback';
 import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName, getProjectName } from '@/utils/badgeHelpers';
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
 import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import { LayoutGrid, List } from 'lucide-react';
+import { LayoutGrid, List, Filter, ChevronsUpDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  TableBody,
+  TableCell,
+  TableColumnHeader,
+  TableHead,
+  TableHeader,
+  TableProvider,
+  TableRow,
+  TableHeaderGroup,
+} from '@/components/ui/shadcn-io/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ColumnDef } from '@tanstack/react-table';
 
 export default function BugsPage() {
   const router = useRouter();
@@ -42,29 +52,67 @@ export default function BugsPage() {
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [dragStartStatus, setDragStartStatus] = useState<BugStatus | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const cursorsRef = useRef(cursors);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 10;
 
-  const loadData = async () => {
+  useEffect(() => {
+    cursorsRef.current = cursors;
+  }, [cursors]);
+
+  const loadData = useCallback(async (targetPage: number = 1, overrideCursor?: string | null) => {
     setIsLoading(true);
     setLoadError(null);
     
     try {
+      const cursorToUse = overrideCursor !== undefined ? overrideCursor : cursorsRef.current[targetPage - 1];
+
       const [bugsData, usersData, projectsData] = await Promise.all([
-        bugApi.getAll(),
-        userApi.getAll(),
-        projectApi.getAll(),
+        bugApi.getPaginated(PAGE_SIZE, cursorToUse || undefined, {
+            projectId: projectFilter,
+            status: statusFilter,
+            assignedTo: assigneeFilter,
+            priority: priorityFilter,
+            search: searchQuery
+        }),
+        users.length ? Promise.resolve(users) : userApi.getAll(),
+        projects.length ? Promise.resolve(projects) : projectApi.getAll(),
       ]);
       
-      setBugs(bugsData);
-      setUsers(usersData);
-      setProjects(projectsData);
+      setBugs(bugsData.bugs);
+      if (!users.length) setUsers(usersData);
+      if (!projects.length) setProjects(projectsData);
+      
+      setPage(targetPage);
+      
+      if (bugsData.lastEvaluatedKey) {
+          const nextCursor = JSON.stringify(bugsData.lastEvaluatedKey);
+          setCursors(prev => {
+              // If we reset (targetPage=1 and overrideCursor=null), we clear future cursors
+              if (overrideCursor === null) {
+                  return [null, nextCursor];
+              }
+              const newCursors = [...prev];
+              newCursors[targetPage] = nextCursor;
+              return newCursors;
+          });
+          setHasMore(true);
+      } else {
+          setHasMore(false);
+          if (overrideCursor === null) {
+              setCursors([null]);
+          }
+      }
       
     } catch (err) {
       console.error('Failed to load bugs:', err);
@@ -72,7 +120,14 @@ export default function BugsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, projectFilter, assigneeFilter, priorityFilter, searchQuery, users, projects]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        loadData(1, null);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [loadData]);
 
   const handleViewDetails = (bugId: string) => {
     router.push(`/bugs/${bugId}`);
@@ -83,15 +138,218 @@ export default function BugsPage() {
   };
 
   // Filter bugs based on selected filters
-  const filteredBugs = bugs.filter(bug => {
-    const matchesStatus = statusFilter === 'all' || bug.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || bug.priority === priorityFilter;
-    const matchesSearch = searchQuery === '' || 
-      bug.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      bug.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesStatus && matchesPriority && matchesSearch;
-  });
+  // With server-side pagination, bugs are already filtered
+  const filteredBugs = bugs;
+
+  const columns: ColumnDef<Bug>[] = [
+    {
+      accessorKey: 'title',
+      header: ({ column }) => (
+        <TableColumnHeader column={column} title="Title" className="text-base" />
+      ),
+      cell: ({ row }) => <div className="font-medium text-foreground text-base">{row.getValue('title')}</div>,
+    },
+    {
+      accessorKey: 'projectId',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Project</span>
+                {projectFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setProjectFilter('all')}>
+                All Projects
+              </DropdownMenuItem>
+              {projects.map((project) => (
+                <DropdownMenuItem key={project.id} onClick={() => setProjectFilter(project.id)}>
+                  {project.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      cell: ({ row }) => (
+        <span className="text-base text-muted-foreground">
+          {getProjectName(row.getValue('projectId'), projects)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'priority',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Priority</span>
+                {priorityFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setPriorityFilter('all')}>
+                All Priorities
+              </DropdownMenuItem>
+              {Object.values(BugPriority).map((priority) => (
+                <DropdownMenuItem key={priority} onClick={() => setPriorityFilter(priority)}>
+                  <Badge variant={getPriorityBadgeVariant(priority)} className="mr-2 flex items-center gap-1">
+                    <PriorityIcon priority={priority} />
+                    {priority}
+                  </Badge>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const priority = row.getValue('priority') as BugPriority;
+        return (
+          <Badge variant={getPriorityBadgeVariant(priority)} className="flex items-center gap-1 w-fit text-sm px-2 py-1">
+            <PriorityIcon priority={priority} />
+            {priority}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Status</span>
+                {statusFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setStatusFilter('all')}>
+                All Statuses
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.OPEN)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.OPEN)} className="mr-2">{BugStatus.OPEN}</Badge>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.IN_PROGRESS)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.IN_PROGRESS)} className="mr-2">{BugStatus.IN_PROGRESS}</Badge>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.RESOLVED)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.RESOLVED)} className="mr-2">{BugStatus.RESOLVED}</Badge>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.CLOSED)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.CLOSED)} className="mr-2">{BugStatus.CLOSED}</Badge>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue('status') as BugStatus;
+        return (
+          <Badge variant={getStatusBadgeVariant(status)} className="text-sm px-2 py-1">
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'assignedTo',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Assignee</span>
+                {assigneeFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setAssigneeFilter('all')}>
+                All Assignees
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAssigneeFilter('unassigned')}>
+                 Unassigned
+              </DropdownMenuItem>
+              {users.map((user) => (
+                <DropdownMenuItem key={user.id} onClick={() => setAssigneeFilter(user.id)}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span>{user.name}</span>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const assignedTo = row.getValue('assignedTo') as string | undefined;
+        return (
+          <div className="flex items-center gap-2">
+            {assignedTo ? (
+              <>
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                  {getUserName(assignedTo, users).charAt(0).toUpperCase()}
+                </div>
+                <span className="text-base">{getUserName(assignedTo, users)}</span>
+              </>
+            ) : (
+              <span className="text-base text-muted-foreground">Unassigned</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'createdAt',
+      header: ({ column }) => (
+        <TableColumnHeader column={column} title="Created" className="text-base" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-base text-muted-foreground">
+          {formatRelativeTime(row.getValue('createdAt'))}
+        </span>
+      ),
+    },
+  ];
 
   const kanbanColumns = [
     { id: BugStatus.OPEN, name: 'Open' },
@@ -230,136 +488,47 @@ export default function BugsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="sm:max-w-xs"
           />
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="sm:w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value={BugStatus.OPEN}>{BugStatus.OPEN}</SelectItem>
-              <SelectItem value={BugStatus.IN_PROGRESS}>{BugStatus.IN_PROGRESS}</SelectItem>
-              <SelectItem value={BugStatus.RESOLVED}>{BugStatus.RESOLVED}</SelectItem>
-              <SelectItem value={BugStatus.CLOSED}>{BugStatus.CLOSED}</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="sm:w-[180px]">
-              <SelectValue placeholder="Filter by priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value={BugPriority.HIGHEST}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.HIGHEST} />
-                  {BugPriority.HIGHEST}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.HIGH}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.HIGH} />
-                  {BugPriority.HIGH}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.MEDIUM}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.MEDIUM} />
-                  {BugPriority.MEDIUM}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.LOW}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.LOW} />
-                  {BugPriority.LOW}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.LOWEST}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.LOWEST} />
-                  {BugPriority.LOWEST}
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Results count */}
         <div className="text-sm text-muted-foreground">
-          Showing {filteredBugs.length} of {bugs.length} bugs
+          Showing {filteredBugs.length} bugs on this page (Page {page})
         </div>
 
         {viewMode === 'table' ? (
           /* Bug table */
-          filteredBugs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <p className="text-muted-foreground">No bugs found</p>
-              <Button variant="outline" onClick={handleCreateBug}>
-                Create First Bug
-              </Button>
-            </div>
-          ) : (
             <div className="bg-card rounded-lg border">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Title</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Project</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Priority</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Assignee</th>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBugs.map((bug) => (
-                      <tr 
-                        key={bug.id} 
-                        className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                        onClick={() => handleViewDetails(bug.id)}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-foreground">{bug.title}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-muted-foreground">{getProjectName(bug.projectId, projects)}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1 w-fit">
-                            <PriorityIcon priority={bug.priority} />
-                            {bug.priority}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant={getStatusBadgeVariant(bug.status)}>
-                            {bug.status}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {bug.assignedTo ? (
-                              <>
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                  {getUserName(bug.assignedTo, users).charAt(0).toUpperCase()}
-                                </div>
-                                <span className="text-sm">{getUserName(bug.assignedTo, users)}</span>
-                              </>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">Unassigned</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {formatRelativeTime(bug.createdAt)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <TableProvider columns={columns} data={filteredBugs}>
+                <TableHeader>
+                  {({ headerGroup }) => (
+                    <TableHeaderGroup key={headerGroup.id} headerGroup={headerGroup}>
+                      {({ header }) => <TableHead key={header.id} header={header} className="h-12" />}
+                    </TableHeaderGroup>
+                  )}
+                </TableHeader>
+                <TableBody emptyContent={
+                  <div className="flex flex-col items-center justify-center py-16 gap-4">
+                    <p className="text-muted-foreground">No bugs found</p>
+                    <Button variant="outline" onClick={handleCreateBug}>
+                      Create First Bug
+                    </Button>
+                  </div>
+                }>
+                  {({ row }) => (
+                    <TableRow
+                      key={row.id}
+                      row={row}
+                      className="cursor-pointer hover:bg-muted/30"
+                      onClick={() => handleViewDetails((row.original as Bug).id)}
+                    >
+                      {({ cell }) => (
+                        <TableCell key={cell.id} cell={cell} className="p-4" />
+                      )}
+                    </TableRow>
+                  )}
+                </TableBody>
+              </TableProvider>
             </div>
-          )
         ) : (
           /* Kanban Board */
           <div className="h-[calc(100vh-300px)] min-h-[500px]">
@@ -425,6 +594,31 @@ export default function BugsPage() {
             </KanbanProvider>
           </div>
         )}
+
+        {/* Pagination */}
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadData(page - 1)}
+            disabled={page === 1 || isLoading}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <div className="text-sm font-medium">
+            Page {page}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadData(page + 1)}
+            disabled={!hasMore || isLoading}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

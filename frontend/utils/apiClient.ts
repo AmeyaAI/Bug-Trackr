@@ -183,6 +183,46 @@ export const bugApi = {
   },
 
   /**
+   * Get bugs with pagination and filters
+   */
+  getPaginated: async (
+    pageSize: number, 
+    lastEvaluatedKey?: string,
+    filters?: {
+      projectId?: string;
+      status?: string;
+      assignedTo?: string;
+      priority?: string;
+      search?: string;
+    }
+  ): Promise<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }> => {
+    const params: Record<string, string> = {
+      page_size: pageSize.toString(),
+    };
+
+    if (lastEvaluatedKey) {
+      params.last_evaluated_key = lastEvaluatedKey;
+    }
+
+    if (filters) {
+      if (filters.projectId && filters.projectId !== 'all') params.projectId = filters.projectId;
+      if (filters.status && filters.status !== 'all') params.status = filters.status;
+      if (filters.assignedTo && filters.assignedTo !== 'all') params.assignedTo = filters.assignedTo;
+      if (filters.priority && filters.priority !== 'all') params.priority = filters.priority;
+      if (filters.search) params.search = filters.search;
+    }
+
+    const response = await apiClient.get<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }>('/api/bugs', {
+      params,
+    });
+    
+    return {
+      bugs: response.data.bugs.map(transformDates),
+      lastEvaluatedKey: response.data.lastEvaluatedKey,
+    };
+  },
+
+  /**
    * Get bug by ID with comments
    */
   getById: async (id: string): Promise<BugWithCommentsResponse> => {

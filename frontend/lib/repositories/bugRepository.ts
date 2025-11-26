@@ -13,8 +13,8 @@
  * Requirements: 5.1, 5.2, 5.3, 5.4, 5.6, 5.7
  */
 
-import { CollectionDBService } from '../services/collectionDb';
-import { Bug, CreateBugInput, UpdateBugInput, BugStatus, BugTag } from '../models/bug';
+import { CollectionDBService, FilterQuery } from '../services/collectionDb';
+import { Bug, CreateBugInput, UpdateBugInput, BugStatus, BugTag, BugPriority, BugSeverity } from '../models/bug';
 import { Project } from '../models/project';
 import { User } from '../models/user';
 import { logger } from '../utils/logger';
@@ -84,7 +84,7 @@ function transformBugFromStorage(bug: Record<string, unknown>): Bug {
         if (Array.isArray(parsed)) {
           return parsed.length > 0 ? parsed[0] : undefined;
         }
-      } catch (e) {
+      } catch {
         // Not valid JSON, treat as string
       }
     }
@@ -204,6 +204,31 @@ export class BugRepository {
   }
 
   /**
+   * Retrieves all bugs with pagination
+   * @param pageSize - Number of items per page
+   * @param lastEvaluatedKey - Cursor for next page
+   * @returns Object with bugs and next cursor
+   */
+  async getAllPaginated(pageSize: number, lastEvaluatedKey?: string): Promise<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }> {
+    logger.debug('Fetching paginated bugs', { pageSize, lastEvaluatedKey });
+
+    const result = await this.collectionDb.getAllItemsPaginated<Record<string, unknown>>(COLLECTION_PLURAL, {
+      includeDetail: false,
+      pageSize,
+      lastEvaluatedKey,
+    });
+
+    // Transform tags string to array for each bug
+    const transformedBugs = result.items.map(transformBugFromStorage);
+
+    logger.info('Bugs fetched successfully', { count: transformedBugs.length });
+    return {
+      bugs: transformedBugs,
+      lastEvaluatedKey: result.lastEvaluatedKey
+    };
+  }
+
+  /**
    * Retrieves a bug by ID
    * @param bugId - Bug ID
    * @returns Bug or null if not found
@@ -227,6 +252,96 @@ export class BugRepository {
 
     logger.info('Bug fetched successfully', { bugId });
     return transformedBug;
+  }
+
+  /**
+   * Searches bugs with filters and pagination
+   * @param filters - Filter criteria
+   * @param pageSize - Number of items per page
+   * @param lastEvaluatedKey - Cursor for next page
+   * @returns Object with bugs and next cursor
+   */
+  async search(
+    filters: {
+      projectId?: string;
+      status?: BugStatus;
+      assignedTo?: string;
+      priority?: BugPriority;
+      searchQuery?: string;
+    },
+    pageSize: number,
+    lastEvaluatedKey?: string
+  ): Promise<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }> {
+    logger.debug('Searching bugs', { filters, pageSize, lastEvaluatedKey });
+
+    const dbFilters: FilterQuery[] = [];
+
+    if (filters.projectId && filters.projectId !== 'all') {
+      dbFilters.push({
+        field_name: 'payload.project_id',
+        field_value: filters.projectId,
+        operator: 'contains',
+      });
+    }
+
+    if (filters.status && (filters.status as string) !== 'all') {
+      dbFilters.push({
+        field_name: 'payload.status',
+        field_value: filters.status,
+        operator: 'eq',
+      });
+    }
+
+    if (filters.assignedTo && filters.assignedTo !== 'all') {
+        if (filters.assignedTo === 'unassigned') {
+            dbFilters.push({
+                field_name: 'payload.assigned_to',
+                field_value: null,
+                operator: 'eq',
+            });
+        } else {
+            dbFilters.push({
+                field_name: 'payload.assigned_to',
+                field_value: filters.assignedTo,
+                operator: 'contains',
+            });
+        }
+    }
+
+    if (filters.priority && (filters.priority as string) !== 'all') {
+      dbFilters.push({
+        field_name: 'payload.priority',
+        field_value: filters.priority,
+        operator: 'eq',
+      });
+    }
+
+    if (filters.searchQuery) {
+      dbFilters.push({
+        field_name: 'payload.title',
+        field_value: filters.searchQuery,
+        operator: 'contains',
+      });
+    }
+
+    const result = await this.collectionDb.queryItemsPaginated<Record<string, unknown>>(
+      COLLECTION_PLURAL,
+      dbFilters,
+      {
+        includeDetail: false,
+        pageSize,
+        lastEvaluatedKey,
+      }
+    );
+
+    // Transform tags string to array for each bug
+    const transformedBugs = result.items.map(transformBugFromStorage);
+
+    logger.info('Bugs searched successfully', { count: transformedBugs.length });
+    return {
+      bugs: transformedBugs,
+      lastEvaluatedKey: result.lastEvaluatedKey
+    };
   }
 
   /**

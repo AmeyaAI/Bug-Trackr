@@ -13,7 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { getServiceContainer } from '@/lib/services/serviceContainer';
 import { createBugSchema } from '@/lib/utils/validation';
-import { BugStatus } from '@/lib/models/bug';
+import { BugStatus, BugPriority } from '@/lib/models/bug';
 import { ActivityAction } from '@/lib/models/activity';
 import { logger } from '@/lib/utils/logger';
 
@@ -36,7 +36,25 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const services = getServiceContainer();
     const bugRepo = services.getBugRepository();
     
-    const { projectId, status, assignedTo } = req.query;
+    const { projectId, status, assignedTo, priority, search, page_size, last_evaluated_key } = req.query;
+
+    // If pagination is requested, use the search method which supports multiple filters
+    if (page_size) {
+      const pageSize = parseInt(page_size as string, 10);
+      // last_evaluated_key is passed as string (URL encoded JSON)
+      const lastEvaluatedKey = last_evaluated_key as string;
+      
+      const filters = {
+        projectId: projectId as string,
+        status: status as BugStatus,
+        assignedTo: assignedTo as string,
+        priority: priority as BugPriority,
+        searchQuery: search as string
+      };
+      
+      const result = await bugRepo.search(filters, pageSize, lastEvaluatedKey);
+      return res.status(200).json(result);
+    }
     
     // Validate query parameter types first
     if ((projectId !== undefined && typeof projectId !== 'string') ||
