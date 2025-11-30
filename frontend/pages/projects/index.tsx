@@ -7,7 +7,7 @@
  * Requirements: 5.1, 5.3
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,41 +19,15 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { projectApi, bugApi } from '@/utils/apiClient';
-import { Project, Bug } from '@/utils/types';
+import { useProjects, useBugs } from '@/lib/hooks/useData';
 
 export default function ProjectsPage() {
   const router = useRouter();
-  
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [bugs, setBugs] = useState<Bug[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const [projectsData, bugsData] = await Promise.all([
-        projectApi.getAll(),
-        bugApi.getAll(),
-      ]);
-      
-      setProjects(projectsData);
-      setBugs(bugsData);
-    } catch (err) {
-      console.error('Failed to load projects:', err);
-      setError('Failed to load projects. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { projects, isLoading: isLoadingProjects, isError: projectsError } = useProjects();
+  const { bugs, isLoading: isLoadingBugs, isError: bugsError } = useBugs();
+  const [searchQuery, setSearchQuery] = useState('');  const isLoading = isLoadingProjects || isLoadingBugs;
+  const error = projectsError || bugsError ? 'Failed to load data' : null;
 
   const handleViewProject = (projectId: string) => {
     router.push(`/projects/${projectId}`);
@@ -96,7 +70,7 @@ export default function ProjectsPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <p className="text-destructive">{error}</p>
-            <Button onClick={loadData}>Retry</Button>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
           </div>
         </div>
       </div>

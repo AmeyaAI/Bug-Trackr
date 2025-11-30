@@ -6,7 +6,7 @@
  */
 
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import {
   IconBug,
@@ -19,8 +19,7 @@ import { cn } from "@/lib/utils";
 import { useUser } from "@/contexts/UserContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarUserSelector } from "@/components/SidebarUserSelector";
-import { userApi } from "@/utils/apiClient";
-import { User } from "@/utils/types";
+import { useUsers } from "@/lib/hooks/useData";
 import Link from "next/link";
 
 interface AppSidebarProps {
@@ -30,33 +29,7 @@ interface AppSidebarProps {
 export function AppSidebar({ children }: AppSidebarProps) {
   const { currentUser } = useUser();
   const [open, setOpen] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    const loadUsers = async () => {
-      try {
-        const usersData = await userApi.getAll();
-        if (isMounted) {
-          setUsers(usersData);
-        }
-      } catch (error) {
-        console.error('Failed to load users:', error);
-      } finally {
-        if (isMounted) {
-          setIsLoadingUsers(false);
-        }
-      }
-    };
-    
-    loadUsers();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { users, isLoading: isLoadingUsers } = useUsers();
 
   const links = [
     {
@@ -78,13 +51,6 @@ export function AppSidebar({ children }: AppSidebarProps) {
       href: "/projects",
       icon: (
         <IconFolder className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
-      ),
-    },
-    {
-      label: "Activity Log",
-      href: "/activity-logs",
-      icon: (
-        <IconHistory className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
     },
   ];

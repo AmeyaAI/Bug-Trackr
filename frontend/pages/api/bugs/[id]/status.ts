@@ -140,7 +140,7 @@ export default async function handler(
     logger.debug('Logging status change activity', { bugId: id, newStatus: body.status });
     await activityRepo.create({
       bugId: id,
-      action: ActivityAction.STATUS_CHANGED,
+      action: `${ActivityAction.STATUS_CHANGED}:${body.status}` as ActivityAction,
       authorId: body.userId,
     });
     

@@ -89,7 +89,7 @@ export default async function handler(
     logger.debug('Logging bug assignment activity', { bugId: id, assignedTo: body.assignedTo });
     await activityRepo.create({
       bugId: id,
-      action: ActivityAction.ASSIGNED,
+      action: `${ActivityAction.ASSIGNED}:${body.assignedTo}` as ActivityAction,
       authorId: body.assignedBy,
     });
     

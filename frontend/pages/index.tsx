@@ -5,8 +5,8 @@ import { PriorityIcon } from '@/components/PriorityIcon';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useUser } from '@/contexts/UserContext';
-import { bugApi, projectApi } from '@/utils/apiClient';
-import { Bug, Project, BugStatus, BugPriority } from '@/utils/types';
+import { useBugs, useProjects } from '@/lib/hooks/useData';
+import { BugStatus, BugPriority } from '@/utils/types';
 import { getStatusBadgeVariant, getPriorityBadgeVariant, getProjectName } from '@/utils/badgeHelpers';
 import { AlertCircle, CheckCircle2, Clock, TrendingUp } from 'lucide-react';
 import WelcomeScreen from '@/components/WelcomeScreen';
@@ -24,19 +24,11 @@ interface BugStatistics {
 export default function Home() {
   const router = useRouter();
   const { currentUser } = useUser();
-  const [bugs, setBugs] = useState<Bug[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [statistics, setStatistics] = useState<BugStatistics>({
-    total: 0,
-    open: 0,
-    inProgress: 0,
-    resolved: 0,
-    closed: 0,
-    highest: 0,
-    high: 0,
-  });
+  const { bugs, isLoading: isLoadingBugs } = useBugs();
+  const { projects, isLoading: isLoadingProjects } = useProjects();
+  
   const [showWelcome, setShowWelcome] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const dataLoaded = !isLoadingBugs && !isLoadingProjects;
 
   // Show welcome screen only on first load of the session
   useEffect(() => {
@@ -52,37 +44,16 @@ export default function Home() {
     checkWelcome();
   }, []);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [bugsData, projectsData] = await Promise.all([
-          bugApi.getAll(),
-          projectApi.getAll(),
-        ]);
-        
-        setBugs(bugsData);
-        setProjects(projectsData);
-        
-        // Calculate statistics
-        const stats: BugStatistics = {
-          total: bugsData.length,
-          open: bugsData.filter(b => b.status === BugStatus.OPEN).length,
-          inProgress: bugsData.filter(b => b.status === BugStatus.IN_PROGRESS).length,
-          resolved: bugsData.filter(b => b.status === BugStatus.RESOLVED).length,
-          closed: bugsData.filter(b => b.status === BugStatus.CLOSED).length,
-          highest: bugsData.filter(b => b.priority === BugPriority.HIGHEST).length,
-          high: bugsData.filter(b => b.priority === BugPriority.HIGH).length,
-        };
-        setStatistics(stats);
-        setDataLoaded(true);
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-        setDataLoaded(true);
-      }
-    };
-
-    fetchData();
-  }, []);
+  // Calculate statistics
+  const statistics: BugStatistics = {
+    total: bugs.length,
+    open: bugs.filter(b => b.status === BugStatus.OPEN).length,
+    inProgress: bugs.filter(b => b.status === BugStatus.IN_PROGRESS).length,
+    resolved: bugs.filter(b => b.status === BugStatus.RESOLVED).length,
+    closed: bugs.filter(b => b.status === BugStatus.CLOSED).length,
+    highest: bugs.filter(b => b.priority === BugPriority.HIGHEST).length,
+    high: bugs.filter(b => b.priority === BugPriority.HIGH).length,
+  };
 
   const recentBugs = bugs
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

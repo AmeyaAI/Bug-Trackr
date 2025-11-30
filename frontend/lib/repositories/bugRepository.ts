@@ -14,6 +14,7 @@
  */
 
 import { CollectionDBService, FilterQuery } from '../services/collectionDb';
+import { CacheService } from '../services/cacheService';
 import { Bug, CreateBugInput, UpdateBugInput, BugStatus, BugTag, BugPriority, BugSeverity, BugType } from '../models/bug';
 import { Project } from '../models/project';
 import { User } from '../models/user';
@@ -21,6 +22,7 @@ import { logger } from '../utils/logger';
 
 const COLLECTION_PLURAL = 'bug_tracking_bugss';
 const COLLECTION_SINGULAR = 'bug_tracking_bugs';
+const CACHE_TTL = 60 * 1000; // 1 minute cache for bugs
 
 /**
  * Converts tags array to comma-separated string for Collection DB storage
@@ -160,7 +162,10 @@ function transformBugFromStorage(bug: Record<string, unknown>): Bug {
 }
 
 export class BugRepository {
-  constructor(private readonly collectionDb: CollectionDBService) {}
+  constructor(
+    private readonly collectionDb: CollectionDBService,
+    private readonly cacheService?: CacheService
+  ) {}
 
   /**
    * Creates a new bug
@@ -189,6 +194,11 @@ export class BugRepository {
 
     // Transform tags string back to array
     const bug = transformBugFromStorage(createdBug);
+
+    // Cache the new bug
+    if (this.cacheService) {
+      this.cacheService.set(`bug:${bug.id}`, bug);
+    }
 
     logger.info('Bug created successfully', { id: bug.id, title: bug.title });
     return bug;
@@ -246,6 +256,14 @@ export class BugRepository {
    * @throws {Error} On server errors
    */
   async getById(bugId: string): Promise<Bug | null> {
+    // Check cache first
+    if (this.cacheService) {
+      const cachedBug = this.cacheService.get<Bug>(`bug:${bugId}`);
+      if (cachedBug) {
+        return cachedBug;
+      }
+    }
+
     logger.debug('Fetching bug by ID', { bugId });
 
     const bug = await this.collectionDb.getItemById<Record<string, unknown>>(
@@ -260,6 +278,11 @@ export class BugRepository {
 
     // Transform tags string to array
     const transformedBug = transformBugFromStorage(bug);
+
+    // Cache the result
+    if (this.cacheService) {
+      this.cacheService.set(`bug:${bugId}`, transformedBug);
+    }
 
     logger.info('Bug fetched successfully', { bugId });
     return transformedBug;
@@ -507,6 +530,11 @@ export class BugRepository {
     // Transform tags string to array
     const transformedBug = transformBugFromStorage(updatedBug);
 
+    // Update cache
+    if (this.cacheService) {
+      this.cacheService.set(`bug:${bugId}`, transformedBug);
+    }
+
     logger.info('Bug status updated successfully', { bugId, status });
     return transformedBug;
   }
@@ -532,6 +560,11 @@ export class BugRepository {
 
     // Transform tags string to array
     const transformedBug = transformBugFromStorage(updatedBug);
+
+    // Update cache
+    if (this.cacheService) {
+      this.cacheService.set(`bug:${bugId}`, transformedBug);
+    }
 
     logger.info('Bug assignment updated successfully', { bugId, assignedTo });
     return transformedBug;
@@ -562,6 +595,11 @@ export class BugRepository {
     // Transform tags string to array
     const transformedBug = transformBugFromStorage(updatedBug);
 
+    // Update cache
+    if (this.cacheService) {
+      this.cacheService.set(`bug:${bugId}`, transformedBug);
+    }
+
     logger.info('Bug updated successfully', { bugId });
     return transformedBug;
   }
@@ -576,6 +614,11 @@ export class BugRepository {
     logger.debug('Deleting bug', { bugId });
 
     const deleted = await this.collectionDb.deleteItem(COLLECTION_SINGULAR, bugId);
+
+    // Remove from cache
+    if (this.cacheService) {
+      this.cacheService.delete(`bug:${bugId}`);
+    }
 
     logger.info('Bug deleted successfully', { bugId });
     return deleted;

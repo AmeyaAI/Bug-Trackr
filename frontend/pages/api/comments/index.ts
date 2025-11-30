@@ -85,9 +85,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     // Validate request body
     const body = createCommentSchema.parse(req.body);
     
-    // Verify bug exists
-    logger.debug('Verifying bug exists', { bugId: body.bugId });
-    const bug = await bugRepo.getById(body.bugId);
+    // Verify bug and author exist in parallel
+    logger.debug('Verifying bug and author exist', { bugId: body.bugId, authorId: body.authorId });
+    const [bug, author] = await Promise.all([
+      bugRepo.getById(body.bugId),
+      userRepo.getById(body.authorId)
+    ]);
+
     if (!bug) {
       logger.warn('Bug not found', { bugId: body.bugId });
       return res.status(404).json({
@@ -96,9 +100,6 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       });
     }
     
-    // Verify author exists
-    logger.debug('Verifying author exists', { authorId: body.authorId });
-    const author = await userRepo.getById(body.authorId);
     if (!author) {
       logger.warn('Author user not found', { authorId: body.authorId });
       return res.status(404).json({
@@ -107,20 +108,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       });
     }
     
-    // Create comment
-    const comment = await commentRepo.create({
-      bugId: body.bugId,
-      authorId: body.authorId,
-      message: body.message,
-    });
+    // Create comment and log activity in parallel for performance
+    // This reduces total latency by running the two write operations concurrently
+    logger.debug('Creating comment and activity log in parallel');
     
-    // Log "commented" activity
-    logger.debug('Logging comment activity', { commentId: comment.id, bugId: body.bugId });
-    await activityRepo.create({
-      bugId: body.bugId,
-      action: ActivityAction.COMMENTED,
-      authorId: body.authorId,
-    });
+    const [comment] = await Promise.all([
+      commentRepo.create({
+        bugId: body.bugId,
+        authorId: body.authorId,
+        message: body.message,
+      }),
+      activityRepo.create({
+        bugId: body.bugId,
+        action: ActivityAction.COMMENTED,
+        authorId: body.authorId,
+      })
+    ]);
     
     logger.info('Comment created successfully', { commentId: comment.id, bugId: body.bugId });
     return res.status(201).json(comment);

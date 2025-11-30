@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { LoadingState } from '../components/LoadingState';
-import { activityLogApi } from '../utils/apiClient';
 import { ActivityLog } from '../utils/types';
+import { useActivityLogs } from '../lib/hooks/useData';
 import { 
   Search, 
   ChevronDown, 
@@ -32,28 +32,8 @@ interface GroupedLogs {
 
 const ActivityLogsPage: React.FC = () => {
   const router = useRouter();
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { activityLogs, isLoading: loading, isError: error, mutate: refreshLogs } = useActivityLogs();
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    fetchActivityLogs();
-  }, []);
-
-  const fetchActivityLogs = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const logs = await activityLogApi.getAll();
-      setActivityLogs(logs);
-    } catch (err) {
-      console.error('Failed to fetch activity logs:', err);
-      setError('Failed to load activity logs. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Group logs by date
   const groupedLogs = useMemo(() => {
@@ -228,9 +208,9 @@ const ActivityLogsPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 max-w-md border border-gray-200 dark:border-gray-800">
-          <p className="text-red-500 dark:text-red-400 mb-4 text-sm">{error}</p>
+          <p className="text-red-500 dark:text-red-400 mb-4 text-sm">Failed to load activity logs. Please try again.</p>
           <button
-            onClick={fetchActivityLogs}
+            onClick={() => refreshLogs()}
             className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full text-sm font-medium transition-all shadow-lg hover:shadow-xl"
           >
             Retry

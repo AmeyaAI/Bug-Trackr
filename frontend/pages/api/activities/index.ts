@@ -28,6 +28,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   try {
     const services = getServiceContainer();
     const activityRepo = services.getActivityRepository();
+    const userRepo = services.getUserRepository();
+    const bugRepo = services.getBugRepository();
+    const projectRepo = services.getProjectRepository();
     
     const { bugId, limit } = req.query;
     
@@ -84,9 +87,54 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const sortedActivities = activitiesWithTime
       .sort((a, b) => b.time - a.time)
       .map(item => item.activity);
+
+    // Enrich activities with details
+    const [users, bugs, projects] = await Promise.all([
+      userRepo.getAll(),
+      bugRepo.getAll(),
+      projectRepo.getAll()
+    ]);
+
+    const userMap = new Map(users.map(u => [u.id, u]));
+    const bugMap = new Map(bugs.map(b => [b.id, b]));
+    const projectMap = new Map(projects.map(p => [p.id, p]));
+
+    const enrichedActivities = sortedActivities.map(activity => {
+      const user = userMap.get(activity.authorId);
+      const bug = bugMap.get(activity.bugId);
+      const project = bug ? projectMap.get(bug.projectId) : undefined;
+      
+      // Parse composite action strings
+      let action: string = activity.action;
+      let newStatus = undefined;
+      let assignedToName = undefined;
+
+      if (action.startsWith('status_changed:')) {
+        const parts = action.split(':');
+        action = 'status_changed';
+        newStatus = parts[1];
+      } else if (action.startsWith('assigned:')) {
+        const parts = action.split(':');
+        action = 'assigned';
+        const assignedUserId = parts[1];
+        const assignedUser = userMap.get(assignedUserId);
+        assignedToName = assignedUser ? assignedUser.name : 'Unknown User';
+      }
+
+      return {
+        ...activity,
+        action, // Normalized action
+        newStatus,
+        assignedToName,
+        performedByName: user ? user.name : 'Unknown User',
+        bugTitle: bug ? bug.title : 'Unknown Bug',
+        projectId: bug ? bug.projectId : '',
+        projectName: project ? project.name : 'Unknown Project',
+      };
+    });
     
-    logger.info('Activities fetched successfully', { count: sortedActivities.length });
-    return res.status(200).json(sortedActivities);
+    logger.info('Activities fetched successfully', { count: enrichedActivities.length });
+    return res.status(200).json(enrichedActivities);
     
   } catch (error) {
     logger.error('Error fetching activities', { error });

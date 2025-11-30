@@ -14,10 +14,11 @@ import { Badge } from '@/components/ui/badge';
 import { PriorityIcon } from '@/components/PriorityIcon';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { bugApi, projectApi, userApi } from '@/utils/apiClient';
+import { bugApi, projectApi } from '@/utils/apiClient';
 import { Bug, BugStatus, BugPriority, Project, User, UserRole } from '@/utils/types';
 import { BugType } from '@/lib/models/bug';
 import { useUser } from '@/contexts/UserContext';
+import { useUsers } from '@/lib/hooks/useData';
 import { LoadingState } from '@/components/LoadingState';
 import { ApiErrorFallback } from '@/components/ApiErrorFallback';
 import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName } from '@/utils/badgeHelpers';
@@ -71,7 +72,7 @@ const BUG_TYPE_CONFIG: Record<BugType, { label: string; icon: React.ReactNode; v
           c0-8.586,6.967-15.553,15.563-15.553c8.593,0,15.559,6.967,15.559,15.553c0,8.588-6.966,15.551-15.559,15.551
           C126.206,153.691,119.239,146.728,119.239,138.14z M150.36,231.719c-8.595,0-15.559-6.973-15.559-15.557s6.964-15.547,15.559-15.547
           c8.585,0,15.552,6.963,15.552,15.547S158.945,231.719,150.36,231.719z M180.98,173.492c0-9.606,7.802-17.396,17.414-17.396
-          c9.614,0,17.405,7.791,17.405,17.396c0,9.621-7.791,17.41-17.405,17.41C188.782,190.902,180.98,183.113,180.98,173.492z"/>
+          c9.614,0,17.405,7.791,17.405,17.396c0,9.621-7.791,17.41-17.41-17.405C188.782,190.902,180.98,183.113,180.98,173.492z"/>
       </svg>
     ), 
     variant: 'destructive' 
@@ -111,10 +112,10 @@ export default function ProjectBugsPage() {
   const router = useRouter();
   const { id: projectId } = router.query;
   const { currentUser } = useUser();
+  const { users } = useUsers();
   
   const [project, setProject] = useState<Project | null>(null);
   const [bugs, setBugs] = useState<Bug[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -147,7 +148,7 @@ export default function ProjectBugsPage() {
     try {
       const cursorToUse = overrideCursor !== undefined ? overrideCursor : cursorsRef.current[targetPage - 1];
 
-      const [projectData, bugsData, usersData] = await Promise.all([
+      const [projectData, bugsData] = await Promise.all([
         project ? Promise.resolve(project) : projectApi.getById(projectId),
         bugApi.getPaginated(PAGE_SIZE, cursorToUse || undefined, {
           projectId: projectId,
@@ -156,13 +157,11 @@ export default function ProjectBugsPage() {
           priority: priorityFilter,
           type: typeFilter,
           search: searchQuery
-        }),
-        users.length ? Promise.resolve(users) : userApi.getAll(),
+        })
       ]);
       
       if (!project) setProject(projectData);
       setBugs(bugsData.bugs);
-      if (!users.length) setUsers(usersData);
       
       setPage(targetPage);
       
@@ -189,7 +188,7 @@ export default function ProjectBugsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, statusFilter, assigneeFilter, priorityFilter, typeFilter, searchQuery, project, users]);
+  }, [projectId, statusFilter, assigneeFilter, priorityFilter, typeFilter, searchQuery, project]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

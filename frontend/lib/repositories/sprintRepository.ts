@@ -1,4 +1,5 @@
 import { CollectionDBService } from '../services/collectionDb';
+import { CacheService } from '../services/cacheService';
 import { Sprint, CreateSprintInput, UpdateSprintInput, SprintStatus } from '../models/sprint';
 import { logger } from '../utils/logger';
 
@@ -45,7 +46,10 @@ function transformSprintFromStorage(sprint: Record<string, unknown>): Sprint {
 }
 
 export class SprintRepository {
-  constructor(private readonly collectionDb: CollectionDBService) {}
+  constructor(
+    private readonly collectionDb: CollectionDBService,
+    private readonly cacheService: CacheService
+  ) {}
 
   /**
    * Creates a new sprint
@@ -68,6 +72,10 @@ export class SprintRepository {
     );
 
     const sprint = transformSprintFromStorage(createdSprint);
+    
+    // Invalidate cache for this project
+    this.cacheService.delete(`sprints:project:${data.projectId}`);
+    
     logger.info('Sprint created successfully', { id: sprint.id, name: sprint.name });
     return sprint;
   }
@@ -107,6 +115,10 @@ export class SprintRepository {
     );
 
     const sprint = transformSprintFromStorage(updatedSprint);
+    
+    // Invalidate cache for this project
+    this.cacheService.delete(`sprints:project:${sprint.projectId}`);
+
     logger.info('Sprint updated successfully', { id });
     return sprint;
   }
@@ -115,6 +127,13 @@ export class SprintRepository {
    * Retrieves sprints by project ID
    */
   async getByProject(projectId: string): Promise<Sprint[]> {
+    // Check cache first
+    const cacheKey = `sprints:project:${projectId}`;
+    const cached = this.cacheService.get<Sprint[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     logger.debug('Fetching sprints by project', { projectId });
 
     const sprints = await this.collectionDb.queryItems<Record<string, unknown>>(
@@ -133,6 +152,10 @@ export class SprintRepository {
     );
 
     const transformedSprints = sprints.map(transformSprintFromStorage);
+    
+    // Update cache
+    this.cacheService.set(cacheKey, transformedSprints);
+
     logger.info('Sprints fetched by project successfully', { projectId, count: transformedSprints.length });
     return transformedSprints;
   }

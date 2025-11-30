@@ -11,7 +11,6 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Comment } from '@/utils/types';
 import { getInitials } from '@/lib/utils';
@@ -37,22 +36,23 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
   getUserName = () => 'Unknown User',
 }) => {
   const [newComment, setNewComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!newComment.trim()) return;
 
-    setIsSubmitting(true);
+    const commentText = newComment.trim();
+    
+    // Optimistic UI: Clear input immediately
+    setNewComment('');
+
     try {
-      await onAddComment(bugId, newComment.trim());
-      setNewComment('');
+      await onAddComment(bugId, commentText);
     } catch (error) {
       console.error('Failed to add comment:', error);
-      // Error is already handled by parent component with toast
-    } finally {
-      setIsSubmitting(false);
+      // Restore text on error
+      setNewComment(commentText);
     }
   };
 
@@ -69,51 +69,49 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {/* Comment thread */}
         {sortedComments.length > 0 ? (
-          <ScrollArea className="h-[400px] pr-4">
-            <div className="space-y-4">
-              {sortedComments.map((comment) => {
-                const authorName = getUserName(comment.authorId);
-                const isCurrentUser = comment.authorId === currentUserId;
+          <div className="space-y-4">
+            {sortedComments.map((comment) => {
+              const authorName = getUserName(comment.authorId);
+              const isCurrentUser = comment.authorId === currentUserId;
 
-                return (
-                  <div
-                    key={comment.id}
-                    className="flex gap-3 pb-4 border-b last:border-b-0"
-                  >
-                    <Avatar className="size-8 mt-1">
-                      <AvatarFallback className="text-xs">
-                        {getInitials(authorName)}
-                      </AvatarFallback>
-                    </Avatar>
+              return (
+                <div
+                  key={comment.id}
+                  className="flex gap-3 pb-4 border-b last:border-b-0"
+                >
+                  <Avatar className="size-8 mt-1">
+                    <AvatarFallback className="text-xs">
+                      {getInitials(authorName)}
+                    </AvatarFallback>
+                  </Avatar>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <span className="font-medium text-sm">
-                          {authorName}
-                          {isCurrentUser && (
-                            <span className="text-muted-foreground font-normal ml-1">
-                              (you)
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatRelativeTime(comment.createdAt)}
-                        </span>
-                      </div>
-                      <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {comment.message}
-                        </ReactMarkdown>
-                      </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="font-medium text-sm">
+                        {authorName}
+                        {isCurrentUser && (
+                          <span className="text-muted-foreground font-normal ml-1">
+                            (you)
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatRelativeTime(comment.createdAt)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {comment.message}
+                      </ReactMarkdown>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <p className="text-sm">No comments yet. Be the first to comment!</p>
@@ -134,8 +132,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
                 value={newComment}
                 onChange={setNewComment}
                 placeholder="Add a comment..."
-                minHeight="150px"
-                disabled={isSubmitting}
+                minHeight="100px"
               />
             </div>
           </div>
@@ -146,16 +143,16 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
               variant="ghost"
               size="sm"
               onClick={() => setNewComment('')}
-              disabled={isSubmitting || !newComment.trim()}
+              disabled={!newComment.trim()}
             >
               Cancel
             </Button>
             <Button
               type="submit"
               size="sm"
-              disabled={isSubmitting || !newComment.trim()}
+              disabled={!newComment.trim()}
             >
-              {isSubmitting ? 'Posting...' : 'Post Comment'}
+              Post Comment
             </Button>
           </div>
         </form>

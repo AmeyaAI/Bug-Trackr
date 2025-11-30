@@ -7,14 +7,13 @@
  * Requirements: 3.1, 3.4
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { UserSelector } from '@/components/UserSelector';
 import { useNavbar } from '@/contexts/NavbarContext';
-import { userApi } from '@/utils/apiClient';
-import { User } from '@/utils/types';
+import { useUsers } from '@/lib/hooks/useData';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,23 +22,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const router = useRouter();
   const { isNavbarVisible } = useNavbar();
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
-    try {
-      const usersData = await userApi.getAll();
-      setUsers(usersData);
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    } finally {
-      setIsLoadingUsers(false);
-    }
-  };
+  const { users, isLoading: isLoadingUsers } = useUsers();
 
   const isActive = (path: string) => {
     return router.pathname === path || router.pathname.startsWith(path + '/');

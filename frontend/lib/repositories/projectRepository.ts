@@ -12,12 +12,14 @@
  */
 
 import { CollectionDBService } from '../services/collectionDb';
+import { CacheService } from '../services/cacheService';
 import { Project, CreateProjectInput, UpdateProjectInput } from '../models/project';
 import { User } from '../models/user';
 import { logger } from '../utils/logger';
 
 const COLLECTION_PLURAL = 'bug_tracking_projects';
 const COLLECTION_SINGULAR = 'bug_tracking_project';
+const CACHE_KEY_ALL = 'projects:all';
 
 /**
  * Transforms project data for Collection DB storage
@@ -76,7 +78,10 @@ function transformProjectFromStorage(project: Record<string, unknown>): Project 
 }
 
 export class ProjectRepository {
-  constructor(private readonly collectionDb: CollectionDBService) {}
+  constructor(
+    private readonly collectionDb: CollectionDBService,
+    private readonly cacheService: CacheService
+  ) {}
 
   /**
    * Creates a new project
@@ -96,6 +101,9 @@ export class ProjectRepository {
 
     const project = transformProjectFromStorage(createdProject);
 
+    // Invalidate cache
+    this.cacheService.delete(CACHE_KEY_ALL);
+
     logger.info('Project created successfully', { id: project.id, name: project.name });
     return project;
   }
@@ -106,6 +114,12 @@ export class ProjectRepository {
    * @throws {Error} On server errors
    */
   async getAll(): Promise<Project[]> {
+    // Check cache first
+    const cached = this.cacheService.get<Project[]>(CACHE_KEY_ALL);
+    if (cached) {
+      return cached;
+    }
+
     logger.debug('Fetching all projects');
 
     const projects = await this.collectionDb.getAllItems<Record<string, unknown>>(COLLECTION_PLURAL, {
@@ -114,6 +128,9 @@ export class ProjectRepository {
     });
 
     const transformedProjects = projects.map(transformProjectFromStorage);
+
+    // Update cache
+    this.cacheService.set(CACHE_KEY_ALL, transformedProjects);
 
     logger.info('Projects fetched successfully', { count: transformedProjects.length });
     return transformedProjects;
@@ -164,6 +181,9 @@ export class ProjectRepository {
 
     const project = transformProjectFromStorage(updatedProject);
 
+    // Invalidate cache
+    this.cacheService.delete(CACHE_KEY_ALL);
+
     logger.info('Project updated successfully', { projectId });
     return project;
   }
@@ -178,6 +198,9 @@ export class ProjectRepository {
     logger.debug('Deleting project', { projectId });
 
     const deleted = await this.collectionDb.deleteItem(COLLECTION_SINGULAR, projectId);
+
+    // Invalidate cache
+    this.cacheService.delete(CACHE_KEY_ALL);
 
     logger.info('Project deleted successfully', { projectId });
     return deleted;

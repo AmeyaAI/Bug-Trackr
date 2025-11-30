@@ -13,6 +13,7 @@
  */
 
 import { CollectionDBService } from '../services/collectionDb';
+import { CacheService } from '../services/cacheService';
 import { Comment, CreateCommentInput } from '../models/comment';
 import { Bug, BugTag } from '../models/bug';
 import { User } from '../models/user';
@@ -100,7 +101,10 @@ function transformCommentFromStorage(comment: Record<string, unknown>): Comment 
 }
 
 export class CommentRepository {
-  constructor(private readonly collectionDb: CollectionDBService) {}
+  constructor(
+    private readonly collectionDb: CollectionDBService,
+    private readonly cacheService?: CacheService
+  ) {}
 
   /**
    * Creates a new comment in the collection database.
@@ -125,6 +129,24 @@ export class CommentRepository {
     );
 
     const comment = transformCommentFromStorage(createdComment);
+
+    // Update cache for bug comments (Write-Through)
+    if (this.cacheService) {
+      const cacheKey = `comments:bug:${comment.bugId}`;
+      const cachedComments = this.cacheService.get<Comment[]>(cacheKey);
+      
+      if (cachedComments) {
+        // Append new comment to cached list
+        cachedComments.push(comment);
+        this.cacheService.set(cacheKey, cachedComments);
+        logger.debug('Updated comments cache for bug', { bugId: comment.bugId });
+      } else {
+        // If not in cache, we can't easily reconstruct the list without fetching,
+        // so we leave it empty (it will be fetched and cached on next read)
+        // or we could just invalidate to be safe, but here we just do nothing
+        // as the next read will populate it.
+      }
+    }
 
     logger.info('Comment created successfully', { id: comment.id, bugId: comment.bugId });
     return comment;
@@ -158,6 +180,14 @@ export class CommentRepository {
    * @throws {Error} If the underlying database service throws an error.
    */
   async getById(commentId: string): Promise<Comment | null> {
+    // Check cache first
+    if (this.cacheService) {
+      const cachedComment = this.cacheService.get<Comment>(`comment:${commentId}`);
+      if (cachedComment) {
+        return cachedComment;
+      }
+    }
+
     logger.debug('Fetching comment by ID', { commentId });
 
     const comment = await this.collectionDb.getItemById<Record<string, unknown>>(
@@ -167,7 +197,14 @@ export class CommentRepository {
 
     if (comment) {
       logger.info('Comment fetched successfully', { commentId });
-      return transformCommentFromStorage(comment);
+      const transformedComment = transformCommentFromStorage(comment);
+      
+      // Cache the result
+      if (this.cacheService) {
+        this.cacheService.set(`comment:${commentId}`, transformedComment);
+      }
+      
+      return transformedComment;
     } else {
       logger.debug('Comment not found', { commentId });
       return null;
@@ -182,6 +219,14 @@ export class CommentRepository {
    * @throws {Error} If the database query fails.
    */
   async getByBug(bugId: string): Promise<Comment[]> {
+    // Check cache first
+    if (this.cacheService) {
+      const cachedComments = this.cacheService.get<Comment[]>(`comments:bug:${bugId}`);
+      if (cachedComments) {
+        return cachedComments;
+      }
+    }
+
     logger.debug('Fetching comments by bug', { bugId });
 
     const comments = await this.collectionDb.queryItems<Record<string, unknown>>(
@@ -201,6 +246,11 @@ export class CommentRepository {
 
     const transformedComments = comments.map(transformCommentFromStorage);
 
+    // Cache the result
+    if (this.cacheService) {
+      this.cacheService.set(`comments:bug:${bugId}`, transformedComments);
+    }
+
     logger.info('Comments fetched by bug successfully', { bugId, count: transformedComments.length });
     return transformedComments;
   }
@@ -215,7 +265,24 @@ export class CommentRepository {
   async delete(commentId: string): Promise<boolean> {
     logger.debug('Deleting comment', { commentId });
 
+    // Get comment to invalidate bug comments cache
+    let bugId: string | undefined;
+    if (this.cacheService) {
+      const comment = await this.getById(commentId);
+      if (comment) {
+        bugId = comment.bugId;
+      }
+    }
+
     const deleted = await this.collectionDb.deleteItem(COLLECTION_SINGULAR, commentId);
+
+    // Invalidate caches
+    if (this.cacheService) {
+      this.cacheService.delete(`comment:${commentId}`);
+      if (bugId) {
+        this.cacheService.delete(`comments:bug:${bugId}`);
+      }
+    }
 
     logger.info('Comment deleted successfully', { commentId });
     return deleted;

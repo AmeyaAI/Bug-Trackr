@@ -18,6 +18,7 @@ import { Bug, BugStatus, BugPriority, BugSeverity, User, Project, UserRole, BugT
 import { BugType } from '@/lib/models/bug';
 import { Sprint } from '@/lib/models/sprint';
 import { useUser } from '@/contexts/UserContext';
+import { useUsers, useProjects, useSprints } from '@/lib/hooks/useData';
 import { LoadingState } from '@/components/LoadingState';
 import { ApiErrorFallback } from '@/components/ApiErrorFallback';
 import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName, getProjectName, getBugTypeBorderClass } from '@/utils/badgeHelpers';
@@ -56,9 +57,6 @@ export default function BugsPage() {
   const { currentUser } = useUser();
   
   const [bugs, setBugs] = useState<Bug[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
   
@@ -73,6 +71,11 @@ export default function BugsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [dragStartStatus, setDragStartStatus] = useState<BugStatus | null>(null);
+
+  // Data hooks
+  const { users } = useUsers();
+  const { projects } = useProjects();
+  const { sprints } = useSprints(projectFilter);
 
   // Pagination states
   const [page, setPage] = useState(1);
@@ -127,23 +130,6 @@ export default function BugsPage() {
     
   }, [router.isReady, router.query, projectFilter, sprintFilter, statusFilter, assigneeFilter, priorityFilter, severityFilter, typeFilter, searchQuery]);
 
-  // Load sprints when project changes
-  useEffect(() => {
-    const loadSprints = async () => {
-      if (projectFilter === 'all') {
-        setSprints([]);
-        return;
-      }
-      try {
-        const sprintsData = await sprintApi.getByProject(projectFilter);
-        setSprints(sprintsData);
-      } catch (err) {
-        console.error("Failed to load sprints:", err);
-      }
-    };
-    loadSprints();
-  }, [projectFilter]);
-
   useEffect(() => {
     cursorsRef.current = cursors;
   }, [cursors]);
@@ -163,24 +149,18 @@ export default function BugsPage() {
       const cursorToUse = overrideCursor !== undefined ? overrideCursor : cursorsRef.current[targetPage - 1];
       const currentPageSize = viewMode === 'kanban' ? 1000 : PAGE_SIZE;
 
-      const [bugsData, usersData, projectsData] = await Promise.all([
-        bugApi.getPaginated(currentPageSize, cursorToUse || undefined, {
-            projectId: projectFilter,
-            sprintId: sprintFilter,
-            status: statusFilter,
-            assignedTo: assigneeFilter,
-            priority: priorityFilter,
-            severity: severityFilter,
-            type: typeFilter,
-            search: searchQuery
-        }),
-        users.length ? Promise.resolve(users) : userApi.getAll(),
-        projects.length ? Promise.resolve(projects) : projectApi.getAll(),
-      ]);
+      const bugsData = await bugApi.getPaginated(currentPageSize, cursorToUse || undefined, {
+          projectId: projectFilter,
+          sprintId: sprintFilter,
+          status: statusFilter,
+          assignedTo: assigneeFilter,
+          priority: priorityFilter,
+          severity: severityFilter,
+          type: typeFilter,
+          search: searchQuery
+      });
       
       setBugs(bugsData.bugs);
-      if (!users.length) setUsers(usersData);
-      if (!projects.length) setProjects(projectsData);
       
       setPage(targetPage);
       
@@ -209,7 +189,7 @@ export default function BugsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter, projectFilter, sprintFilter, assigneeFilter, priorityFilter, severityFilter, typeFilter, searchQuery, users, projects, viewMode]);
+  }, [statusFilter, projectFilter, sprintFilter, assigneeFilter, priorityFilter, severityFilter, typeFilter, searchQuery, viewMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

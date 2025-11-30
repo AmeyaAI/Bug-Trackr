@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PriorityIcon } from '@/components/PriorityIcon';
 import { SeverityIcon } from '@/components/SeverityIcon';
+import { TypeIcon } from '@/components/TypeIcon';
 import { TagBadge } from '@/components/TagBadge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
@@ -31,17 +32,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CommentSection } from '@/components/CommentSection';
-import { bugApi, projectApi, userApi, commentApi, sprintApi, handleApiError, ApiErrorResponse } from '@/utils/apiClient';
-import { Bug, Comment, BugStatus, Project, User, UserRole, getRolePermissions } from '@/utils/types';
-import { Sprint } from '@/lib/models/sprint';
-import { getUserName as getNameFromUsers, getStatusBadgeVariant, getPriorityBadgeVariant, getSeverityBadgeVariant } from '@/utils/badgeHelpers';
+import { bugApi, commentApi, handleApiError, ApiErrorResponse } from '@/utils/apiClient';
+import { Bug, Comment, BugStatus, UserRole, getRolePermissions } from '@/utils/types';
+import { getUserName as getNameFromUsers, getStatusBadgeVariant } from '@/utils/badgeHelpers';
 import { useUser } from '@/contexts/UserContext';
+import { useUsers, useProjects, useSprints } from '@/lib/hooks/useData';
 import { useToast } from '@/contexts/ToastContext';
 import { LoadingState } from '@/components/LoadingState';
 import { handleEventualConsistency } from '@/utils/apiHelpers';
 import { AxiosError } from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { BugActivityLog } from '@/components/BugActivityLog';
+import { History, ArrowLeft, Layers, Calendar, Clock, User as UserIcon } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { getInitials } from '@/lib/utils';
 
 export default function BugDetailsPage() {
   const router = useRouter();
@@ -51,13 +56,19 @@ export default function BugDetailsPage() {
   
   const [bug, setBug] = useState<Bug | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [project, setProject] = useState<Project | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [reportedByUser, setReportedByUser] = useState<User | null>(null);
-  const [assignedUser, setAssignedUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  
+  // Data hooks
+  const { users } = useUsers();
+  const { projects } = useProjects();
+  const { sprints } = useSprints(bug?.projectId || 'all');
+
+  // Derived state
+  const project = projects.find(p => p.id === bug?.projectId) || null;
+  const reportedByUser = users.find(u => u.id === bug?.reportedBy) || null;
+  const assignedUser = users.find(u => u.id === bug?.assignedTo) || null;
+  const sprint = sprints.find(s => s.id === bug?.sprintId) || null;
   
   // Dialog states
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -67,51 +78,29 @@ export default function BugDetailsPage() {
   const [selectedStatus, setSelectedStatus] = useState<BugStatus | null>(null);
   const [selectedSprint, setSelectedSprint] = useState<string>('backlog');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
 
-  const loadBugDetails = useCallback(async (bugId: string) => {
-    setIsLoading(true);
+  const loadBugDetails = useCallback(async (bugId: string, showLoading = true) => {
+    if (showLoading) {
+      setIsLoading(true);
+    }
     setLoadError(null);
     
     try {
-      const [bugData, usersData] = await Promise.all([
-        bugApi.getById(bugId),
-        userApi.getAll(),
-      ]);
+      const bugData = await bugApi.getById(bugId);
       
       setBug(bugData.bug);
       setComments(bugData.comments);
-      setUsers(usersData);
       
-      // Load project details
-      if (bugData.bug.projectId) {
-        try {
-          const [projectData, sprintsData] = await Promise.all([
-            projectApi.getById(bugData.bug.projectId),
-            sprintApi.getByProject(bugData.bug.projectId)
-          ]);
-          setProject(projectData);
-          setSprints(sprintsData);
-        } catch (err) {
-          console.warn('Failed to load project details or sprints:', err);
-          // Don't fail the whole page load if project fails
-        }
-      }
-      
-      // Find reported by and assigned users
-      const reporter = usersData.find(u => u.id === bugData.bug.reportedBy);
-      const assignee = bugData.bug.assignedTo 
-        ? usersData.find(u => u.id === bugData.bug.assignedTo)
-        : null;
-      
-      setReportedByUser(reporter || null);
-      setAssignedUser(assignee || null);
     } catch (err) {
       console.error('Failed to load bug details:', err);
       const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       setLoadError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   }, [toast]);
 
@@ -127,6 +116,19 @@ export default function BugDetailsPage() {
       throw new Error('Please select a user first');
     }
 
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const tempComment: Comment = {
+      id: tempId,
+      bugId,
+      authorId: currentUser.id,
+      message,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Update UI immediately
+    setComments(prev => [...prev, tempComment]);
+
     try {
       await commentApi.create({
         bugId,
@@ -136,11 +138,13 @@ export default function BugDetailsPage() {
       
       toast.success('Comment added successfully');
       
-      // Reload bug details to get updated comments
+      // Reload bug details in background to get real ID and any other updates
       if (id && typeof id === 'string') {
-        await loadBugDetails(id);
+        await loadBugDetails(id, false);
       }
     } catch (err) {
+      // Revert optimistic update on error
+      setComments(prev => prev.filter(c => c.id !== tempId));
       const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
       throw err;
@@ -154,7 +158,7 @@ export default function BugDetailsPage() {
     try {
       await handleEventualConsistency(
         () => bugApi.validate(bug.id, currentUser.id, currentUser.role),
-        () => loadBugDetails(bug.id)
+        () => loadBugDetails(bug.id, false)
       );
       toast.success('Bug validated successfully');
     } catch (err) {
@@ -182,7 +186,7 @@ export default function BugDetailsPage() {
           userId: currentUser.id,
           userRole: currentUser.role as UserRole,
         }),
-        () => loadBugDetails(bug.id)
+        () => loadBugDetails(bug.id, false)
       );
       toast.success('Bug closed successfully');
     } catch (err) {
@@ -204,7 +208,7 @@ export default function BugDetailsPage() {
           assignedTo: selectedAssignee,
           assignedBy: currentUser.id,
         }),
-        () => loadBugDetails(bug.id)
+        () => loadBugDetails(bug.id, false)
       );
       toast.success('Bug assigned successfully');
       setShowAssignDialog(false);
@@ -229,7 +233,7 @@ export default function BugDetailsPage() {
           userId: currentUser.id,
           userRole: currentUser.role as UserRole,
         }),
-        () => loadBugDetails(bug.id)
+        () => loadBugDetails(bug.id, false)
       );
       toast.success('Bug status updated successfully');
       setShowStatusDialog(false);
@@ -251,7 +255,7 @@ export default function BugDetailsPage() {
       const sprintIdToUpdate = selectedSprint === 'backlog' ? null : selectedSprint;
       await handleEventualConsistency(
         () => bugApi.updateSprint(bug.id, sprintIdToUpdate, currentUser.role),
-        () => loadBugDetails(bug.id)
+        () => loadBugDetails(bug.id, false)
       );
       toast.success('Bug moved to sprint successfully');
       setShowSprintDialog(false);
@@ -290,202 +294,263 @@ export default function BugDetailsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header with back button */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => router.push('/bugs')}>
-            ← Back
+    <div className="flex flex-col bg-background p-6">
+      <div className="flex-1 max-w-7xl mx-auto space-y-6">
+        {/* Header with back button and actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <Button variant="ghost" onClick={() => router.push('/bugs')} className="w-fit pl-0 hover:pl-2 transition-all">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Bugs
           </Button>
+          
+          <div className="flex items-center gap-2">
+             <Button variant="outline" onClick={() => setShowActivityLog(true)} className="gap-2">
+                <History className="w-4 h-4" />
+                Activity Log
+             </Button>
+             
+             {/* Role-based action buttons */}
+             {currentUser && permissions && (
+               <>
+                 {/* Tester-specific: Validation controls */}
+                 {permissions.canValidateBug && !bug.validated && bug.status === BugStatus.RESOLVED && (
+                   <Button onClick={handleValidate} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700">
+                     ✓ Validate
+                   </Button>
+                 )}
+                 
+                 {/* Tester-specific: Closure controls */}
+                 {permissions.canCloseBug && bug.validated && bug.status !== BugStatus.CLOSED && (
+                   <Button onClick={handleClose} disabled={isSubmitting} variant="secondary">
+                     Close Bug
+                   </Button>
+                 )}
+                 
+                 {/* Developer-specific: Assignment controls */}
+                 {permissions.canAssignBug && bug.status !== BugStatus.CLOSED && (
+                   <Button 
+                     variant="outline" 
+                     onClick={() => {
+                       setSelectedAssignee(bug.assignedTo || '');
+                       setShowAssignDialog(true);
+                     }}
+                     disabled={isSubmitting}
+                   >
+                     {bug.assignedTo ? 'Reassign' : 'Assign'}
+                   </Button>
+                 )}
+                 
+                 {/* Developer-specific: Status update controls */}
+                 {permissions.canUpdateStatus && bug.status !== BugStatus.CLOSED && (
+                   <Button 
+                     variant="outline" 
+                     onClick={() => {
+                       setSelectedStatus(bug.status);
+                       setShowStatusDialog(true);
+                     }}
+                     disabled={isSubmitting}
+                   >
+                     Update Status
+                   </Button>
+                 )}
+
+                 {/* Admin-specific: Move to Sprint */}
+                 {currentUser.role === UserRole.ADMIN && (
+                   <Button 
+                     variant="outline" 
+                     onClick={() => {
+                       setSelectedSprint(bug.sprintId || 'backlog');
+                       setShowSprintDialog(true);
+                     }}
+                     disabled={isSubmitting}
+                   >
+                     Move to Sprint
+                   </Button>
+                 )}
+               </>
+             )}
+          </div>
         </div>
 
-        {/* Bug details card */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-2xl mb-4">{bug.title}</CardTitle>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content Area */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="border-none shadow-md">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted">
+                    <TypeIcon type={bug.type} className="w-3.5 h-3.5" />
+                    <span className="capitalize font-medium">{bug.type}</span>
+                  </div>
+                  <span>•</span>
+                  <span className="font-mono text-xs">{bug.id}</span>
+                  <span>•</span>
+                  <span>{project?.name}</span>
+                </div>
+                <CardTitle className="text-3xl font-bold tracking-tight">{bug.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Description</h3>
+                  <div className="bg-muted/30 rounded-lg p-6 border">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {bug.description}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Comments Section */}
+            {currentUser && (
+              <CommentSection
+                bugId={bug.id}
+                comments={comments}
+                currentUserId={currentUser.id}
+                currentUserName={currentUser.name}
+                onAddComment={handleAddComment}
+                getUserName={getUserName}
+              />
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Details Card */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-semibold">Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Status */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <Badge variant={getStatusBadgeVariant(bug.status)} className="px-2.5 py-0.5">
+                    {bug.status}
+                  </Badge>
+                </div>
+
+                {/* Priority */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Priority</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium text-sm">Status:</span>
-                    <Badge variant={getStatusBadgeVariant(bug.status)} className="text-sm px-2.5 py-1">
-                      {bug.status || 'N/A'}
+                    <PriorityIcon priority={bug.priority} />
+                    <span className="text-sm font-medium">{bug.priority}</span>
+                  </div>
+                </div>
+
+                {/* Severity */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Severity</span>
+                  <div className="flex items-center gap-2">
+                    <SeverityIcon severity={bug.severity} />
+                    <span className="text-sm font-medium">{bug.severity}</span>
+                  </div>
+                </div>
+
+                {/* Sprint */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Sprint</span>
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{sprint ? sprint.name : 'Backlog'}</span>
+                  </div>
+                </div>
+
+                {/* Validation Status */}
+                {bug.validated && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Validation</span>
+                    <Badge variant="secondary" className="text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+                      ✓ Validated
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium text-sm">Priority:</span>
-                    <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1.5 text-sm px-2.5 py-1">
-                      <PriorityIcon priority={bug.priority} />
-                      {bug.priority || 'N/A'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium text-sm">Severity:</span>
-                    <Badge variant={getSeverityBadgeVariant(bug.severity)} className="flex items-center gap-1.5 text-sm px-2.5 py-1">
-                      <SeverityIcon severity={bug.severity} />
-                      {bug.severity || 'N/A'}
-                    </Badge>
-                  </div>
-                  {bug.validated && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground font-medium text-sm">Validation:</span>
-                      <Badge variant="secondary" className="text-sm px-2.5 py-1">
-                        ✓ Validated
-                      </Badge>
+                )}
+
+                {/* Tags */}
+                {bug.tags && bug.tags.length > 0 && (
+                  <div className="pt-2 border-t">
+                    <span className="text-sm text-muted-foreground block mb-3">Tags</span>
+                    <div className="flex flex-wrap gap-2">
+                      {bug.tags.map((tag) => (
+                        <TagBadge key={tag} tag={tag} />
+                      ))}
                     </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Tags section */}
-              {bug.tags && bug.tags.length > 0 && (
-                <div className="flex items-start gap-2 mt-4">
-                  <span className="text-muted-foreground font-medium text-sm">Tags:</span>
-                  <div className="flex flex-wrap gap-2">
-                    {bug.tags.map((tag) => (
-                      <TagBadge key={tag} tag={tag} />
-                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* People Card */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-semibold">People</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Assignee */}
+                <div className="space-y-2">
+                  <span className="text-sm text-muted-foreground">Assignee</span>
+                  <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>{assignedUser ? getInitials(assignedUser.name) : '?'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{assignedUser?.name || 'Unassigned'}</span>
+                      {assignedUser && <span className="text-xs text-muted-foreground capitalize">{assignedUser.role}</span>}
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          </CardHeader>
 
-          <CardContent className="space-y-6">
-            {/* Description */}
-            <div>
-              <h3 className="font-semibold mb-2">Description</h3>
-              <div className="bg-muted/70 rounded-lg p-4 prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {bug.description}
-                </ReactMarkdown>
-              </div>
-            </div>
+                {/* Reporter */}
+                <div className="space-y-2">
+                  <span className="text-sm text-muted-foreground">Reporter</span>
+                  <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>{reportedByUser ? getInitials(reportedByUser.name) : '?'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{reportedByUser?.name || 'Unknown'}</span>
+                      {reportedByUser && <span className="text-xs text-muted-foreground capitalize">{reportedByUser.role}</span>}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Metadata grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-              <div>
-                <p className="text-sm text-muted-foreground">Project</p>
-                <p className="font-medium">{project?.name || 'Loading...'}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-muted-foreground">Reported By</p>
-                <p className="font-medium">{reportedByUser?.name || 'Unknown'}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-muted-foreground">Assigned To</p>
-                <p className="font-medium">{assignedUser?.name || 'Unassigned'}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-muted-foreground">Created</p>
-                <p className="font-medium">
-                  {new Date(bug.createdAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </p>
-              </div>
-            </div>
+            {/* Dates Card */}
+            <Card className="shadow-sm">
+              <CardContent className="pt-6 space-y-4">
+                <div className="flex items-center gap-3 text-sm">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground text-xs">Created</span>
+                    <span className="font-medium">
+                      {new Date(bug.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground text-xs">Updated</span>
+                    <span className="font-medium">
+                      {new Date(bug.updatedAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-            {/* Role-based action buttons */}
-            {currentUser && permissions && (
-              <div className="flex flex-wrap gap-2 pt-4 border-t">
-                {/* Tester-specific: Validation controls */}
-                {permissions.canValidateBug && !bug.validated && bug.status === BugStatus.RESOLVED && (
-                  <Button onClick={handleValidate} disabled={isSubmitting}>
-                    ✓ Validate Bug
-                  </Button>
-                )}
-                
-                {/* Tester-specific: Closure controls */}
-                {permissions.canCloseBug && bug.validated && bug.status !== BugStatus.CLOSED && (
-                  <Button onClick={handleClose} disabled={isSubmitting} variant="secondary">
-                    Close Bug
-                  </Button>
-                )}
-                
-                {/* Developer-specific: Assignment controls */}
-                {permissions.canAssignBug && bug.status !== BugStatus.CLOSED && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSelectedAssignee(bug.assignedTo || '');
-                      setShowAssignDialog(true);
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    {bug.assignedTo ? 'Reassign' : 'Assign'}
-                  </Button>
-                )}
-                
-                {/* Developer-specific: Status update controls */}
-                {permissions.canUpdateStatus && bug.status !== BugStatus.CLOSED && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSelectedStatus(bug.status);
-                      setShowStatusDialog(true);
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    Update Status
-                  </Button>
-                )}
-
-                {/* Admin-specific: Move to Sprint */}
-                {currentUser.role === UserRole.ADMIN && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSelectedSprint(bug.sprintId || 'backlog');
-                      setShowSprintDialog(true);
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    Move to Sprint
-                  </Button>
-                )}
-
-                {/* Show message if no actions available */}
-                {!permissions.canValidateBug && 
-                 !permissions.canCloseBug && 
-                 !permissions.canAssignBug && 
-                 !permissions.canUpdateStatus && (
-                  <p className="text-sm text-muted-foreground">
-                    No actions available for your role
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Prompt to select user if not logged in */}
-            {!currentUser && (
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground">
-                  Please select a user from the navigation to perform actions
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Comments section */}
-        {currentUser && (
-          <CommentSection
-            bugId={bug.id}
-            comments={comments}
-            currentUserId={currentUser.id}
-            currentUserName={currentUser.name}
-            onAddComment={handleAddComment}
-            getUserName={getUserName}
-          />
-        )}
-
-        {/* Assign dialog */}
+        {/* Dialogs */}
         <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
           <DialogContent>
             <DialogHeader>
@@ -519,7 +584,6 @@ export default function BugDetailsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Status update dialog */}
         <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
           <DialogContent>
             <DialogHeader>
@@ -554,7 +618,6 @@ export default function BugDetailsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Sprint Dialog */}
         <Dialog open={showSprintDialog} onOpenChange={setShowSprintDialog}>
           <DialogContent>
             <DialogHeader>
@@ -591,6 +654,15 @@ export default function BugDetailsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Activity Log Panel */}
+        {bug && (
+          <BugActivityLog 
+            bugId={bug.id} 
+            isOpen={showActivityLog} 
+            onClose={() => setShowActivityLog(false)} 
+          />
+        )}
       </div>
     </div>
   );

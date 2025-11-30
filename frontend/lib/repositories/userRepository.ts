@@ -12,14 +12,19 @@
  */
 
 import { CollectionDBService } from '../services/collectionDb';
+import { CacheService } from '../services/cacheService';
 import { User, CreateUserInput, UpdateUserInput } from '../models/user';
 import { logger } from '../utils/logger';
 
 const COLLECTION_PLURAL = 'users';
 const COLLECTION_SINGULAR = 'user';
+const CACHE_KEY_ALL = 'users:all';
 
 export class UserRepository {
-  constructor(private readonly collectionDb: CollectionDBService) {}
+  constructor(
+    private readonly collectionDb: CollectionDBService,
+    private readonly cacheService: CacheService
+  ) {}
 
   /**
    * Creates a new user
@@ -42,6 +47,9 @@ export class UserRepository {
       userToCreate
     );
 
+    // Invalidate cache
+    this.cacheService.delete(CACHE_KEY_ALL);
+
     logger.info('User created successfully', { id: createdUser.id, email: createdUser.email });
     return createdUser;
   }
@@ -52,11 +60,25 @@ export class UserRepository {
    * @throws {Error} On server errors
    */
   async getAll(): Promise<User[]> {
+    // Check cache first
+    const cached = this.cacheService.get<User[]>(CACHE_KEY_ALL);
+    if (cached) {
+      return cached;
+    }
+
     logger.debug('Fetching all users');
 
     const users = await this.collectionDb.getAllItems<User>(COLLECTION_PLURAL, {
       includeDetail: false, // Faster queries
       pageSize: 1000,
+    });
+
+    // Update cache
+    this.cacheService.set(CACHE_KEY_ALL, users);
+    
+    // Also populate individual user cache to speed up getById calls
+    users.forEach(user => {
+      this.cacheService.set(`user:${user.id}`, user);
     });
 
     logger.info('Users fetched successfully', { count: users.length });
@@ -70,11 +92,19 @@ export class UserRepository {
    * @throws {Error} On server errors
    */
   async getById(userId: string): Promise<User | null> {
+    const cacheKey = `user:${userId}`;
+    const cached = this.cacheService.get<User>(cacheKey);
+    if (cached) {
+      logger.debug('Returning cached user', { userId });
+      return cached;
+    }
+
     logger.debug('Fetching user by ID', { userId });
 
     const user = await this.collectionDb.getItemById<User>(COLLECTION_SINGULAR, userId);
 
     if (user) {
+      this.cacheService.set(cacheKey, user);
       logger.info('User fetched successfully', { userId });
     } else {
       logger.debug('User not found', { userId });
@@ -138,6 +168,9 @@ export class UserRepository {
       }
     );
 
+    // Invalidate cache
+    this.cacheService.delete(CACHE_KEY_ALL);
+
     logger.info('User updated successfully', { userId });
     return updatedUser;
   }
@@ -152,6 +185,9 @@ export class UserRepository {
     logger.debug('Deleting user', { userId });
 
     const deleted = await this.collectionDb.deleteItem(COLLECTION_SINGULAR, userId);
+
+    // Invalidate cache
+    this.cacheService.delete(CACHE_KEY_ALL);
 
     logger.info('User deleted successfully', { userId });
     return deleted;

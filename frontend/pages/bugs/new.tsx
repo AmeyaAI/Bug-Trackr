@@ -34,15 +34,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { bugApi, projectApi, sprintApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
-import { BugPriority, BugSeverity, Project } from "@/utils/types";
+import { bugApi, sprintApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
+import { BugPriority, BugSeverity } from "@/utils/types";
 import { Sprint } from "@/lib/models/sprint";
-import { BugTag, ALL_BUG_TAGS, BugType } from "@/lib/models/bug";
+import { BugTag, BugType } from "@/lib/models/bug";
 import { useUser } from "@/contexts/UserContext";
+import { useProjects } from "@/lib/hooks/useData";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
-import { TagBadge } from "@/components/TagBadge";
 import { useToast } from "@/contexts/ToastContext";
 import { AxiosError } from "axios";
 
@@ -62,9 +62,8 @@ export default function NewBugPage() {
   const { currentUser } = useUser();
   const toast = useToast();
 
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { projects, isLoading: isLoadingProjects } = useProjects();
   const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingSprints, setIsLoadingSprints] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBugTypeDialog, setShowBugTypeDialog] = useState(true);
@@ -120,24 +119,6 @@ export default function NewBugPage() {
       setValue("severity", allowedSeverities[0]);
     }
   }, [selectedType, getSeveritiesForType, selectedSeverity, setValue]);
-
-  const loadProjects = useCallback(async () => {
-    setIsLoadingProjects(true);
-    try {
-      const projectsData = await projectApi.getAll();
-      setProjects(projectsData);
-    } catch (err) {
-      console.error("Failed to load projects:", err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
-      toast.error(errorMessage);
-    } finally {
-      setIsLoadingProjects(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
 
   useEffect(() => {
     const loadSprints = async () => {

@@ -27,13 +27,21 @@ export function getStatusBadgeVariant(
  * @param type - Bug type enum value
  * @returns Tailwind border class string
  */
-export function getBugTypeBorderClass(type: BugType): string {
-  switch (type) {
-    case 'epic': return 'border-l-4 border-l-purple-500';
-    case 'task': return 'border-l-4 border-l-green-500';
-    case 'bug': return 'border-l-4 border-l-red-500';
-    case 'suggestion': return 'border-l-4 border-l-blue-500';
-    default: return 'border-l-4 border-l-gray-300';
+export function getBugTypeBorderClass(type: BugType | string): string {
+  const normalizedType = (type || '').toLowerCase();
+  
+  switch (normalizedType) {
+    case 'epic':
+      return 'border-l-4 border-l-purple-500';
+    case 'task':
+      return 'border-l-4 border-l-green-500';
+    case 'suggestion':
+      return 'border-l-4 border-l-blue-500';
+    default:
+      if (normalizedType.includes('bug')) {
+        return 'border-l-4 border-l-red-500';
+      }
+      return 'border-l-4 border-l-gray-300';
   }
 }
 

@@ -15,6 +15,7 @@
  */
 
 import { CollectionDBService } from './collectionDb';
+import { CacheService } from './cacheService';
 import { UserRepository } from '../repositories/userRepository';
 import { ProjectRepository } from '../repositories/projectRepository';
 import { BugRepository } from '../repositories/bugRepository';
@@ -30,6 +31,7 @@ import { logger } from '../utils/logger';
  */
 export class ServiceContainer {
   private collectionDb: CollectionDBService | null = null;
+  private cacheService: CacheService | null = null;
   private userRepository: UserRepository | null = null;
   private projectRepository: ProjectRepository | null = null;
   private bugRepository: BugRepository | null = null;
@@ -69,6 +71,18 @@ export class ServiceContainer {
   }
 
   /**
+   * Lazily initializes the Cache Service
+   * @returns CacheService instance
+   */
+  private getCacheService(): CacheService {
+    if (!this.cacheService) {
+      logger.debug('Lazy initializing Cache Service');
+      this.cacheService = new CacheService();
+    }
+    return this.cacheService;
+  }
+
+  /**
    * Gets the UserRepository instance (lazy initialization)
    * @returns UserRepository for user data operations
    */
@@ -76,7 +90,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.userRepository) {
       logger.debug('Lazy initializing UserRepository');
-      this.userRepository = new UserRepository(this.initializeCollectionDB());
+      this.userRepository = new UserRepository(this.initializeCollectionDB(), this.getCacheService());
     }
     return this.userRepository;
   }
@@ -89,7 +103,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.projectRepository) {
       logger.debug('Lazy initializing ProjectRepository');
-      this.projectRepository = new ProjectRepository(this.initializeCollectionDB());
+      this.projectRepository = new ProjectRepository(this.initializeCollectionDB(), this.getCacheService());
     }
     return this.projectRepository;
   }
@@ -102,7 +116,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.bugRepository) {
       logger.debug('Lazy initializing BugRepository');
-      this.bugRepository = new BugRepository(this.initializeCollectionDB());
+      this.bugRepository = new BugRepository(this.initializeCollectionDB(), this.getCacheService());
     }
     return this.bugRepository;
   }
@@ -115,7 +129,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.sprintRepository) {
       logger.debug('Lazy initializing SprintRepository');
-      this.sprintRepository = new SprintRepository(this.initializeCollectionDB());
+      this.sprintRepository = new SprintRepository(this.initializeCollectionDB(), this.getCacheService());
     }
     return this.sprintRepository;
   }
@@ -128,7 +142,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.commentRepository) {
       logger.debug('Lazy initializing CommentRepository');
-      this.commentRepository = new CommentRepository(this.initializeCollectionDB());
+      this.commentRepository = new CommentRepository(this.initializeCollectionDB(), this.getCacheService());
     }
     return this.commentRepository;
   }
@@ -141,7 +155,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.activityRepository) {
       logger.debug('Lazy initializing ActivityRepository');
-      this.activityRepository = new ActivityRepository(this.initializeCollectionDB());
+      this.activityRepository = new ActivityRepository(this.initializeCollectionDB(), this.getCacheService());
     }
     return this.activityRepository;
   }
@@ -199,6 +213,11 @@ export class ServiceContainer {
       // Close Collection DB service if it was initialized
       if (this.collectionDb) {
         await this.collectionDb.close();
+      }
+
+      // Clear cache
+      if (this.cacheService) {
+        this.cacheService.clear();
       }
       
       // Clear all repository references

@@ -15,9 +15,11 @@
 import { CollectionDBService } from '../services/collectionDb';
 import { Activity, CreateActivityInput, ActivityAction } from '../models/activity';
 import { logger } from '../utils/logger';
+import { CacheService } from '../services/cacheService';
 
 const COLLECTION_PLURAL = 'bug_tracking_activitiess';
 const COLLECTION_SINGULAR = 'bug_tracking_activities';
+const CACHE_TTL = 60 * 1000; // 1 minute cache for activities
 
 /**
  * Transforms activity data for Collection DB storage
@@ -97,7 +99,10 @@ function transformActivityFromStorage(activity: Record<string, unknown>): Activi
 }
 
 export class ActivityRepository {
-  constructor(private readonly collectionDb: CollectionDBService) {}
+  constructor(
+    private readonly collectionDb: CollectionDBService,
+    private readonly cacheService: CacheService
+  ) {}
 
   /**
    * Creates a new activity in the collection database.
@@ -125,7 +130,7 @@ export class ActivityRepository {
 
     logger.info('Activity created successfully', { 
       id: activity.id, 
-      bugId: activity.bugId,
+      bugId: activity.bugId, 
       action: activity.action 
     });
     return activity;
@@ -146,7 +151,7 @@ export class ActivityRepository {
     });
 
     const transformedActivities = activities.map(transformActivityFromStorage);
-
+    
     logger.info('Activities fetched successfully', { count: transformedActivities.length });
     return transformedActivities;
   }
@@ -167,8 +172,9 @@ export class ActivityRepository {
     );
 
     if (activity) {
+      const transformed = transformActivityFromStorage(activity);
       logger.info('Activity fetched successfully', { activityId });
-      return transformActivityFromStorage(activity);
+      return transformed;
     } else {
       logger.debug('Activity not found', { activityId });
       return null;
@@ -201,7 +207,7 @@ export class ActivityRepository {
     );
 
     const transformedActivities = activities.map(transformActivityFromStorage);
-
+    
     logger.info('Activities fetched by bug successfully', { bugId, count: transformedActivities.length });
     return transformedActivities;
   }
@@ -222,8 +228,14 @@ export class ActivityRepository {
     });
 
     const transformedActivities = activities.map(transformActivityFromStorage);
-
-    logger.info('Recent activities fetched successfully', { count: transformedActivities.length, limit });
-    return transformedActivities;
+    
+    // Sort by timestamp descending if not already sorted by DB
+    transformedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    // Slice to limit
+    const limitedActivities = transformedActivities.slice(0, limit);
+    
+    logger.info('Recent activities fetched successfully', { count: limitedActivities.length, limit });
+    return limitedActivities;
   }
 }
