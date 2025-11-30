@@ -18,6 +18,7 @@ import { CollectionDBService } from './collectionDb';
 import { UserRepository } from '../repositories/userRepository';
 import { ProjectRepository } from '../repositories/projectRepository';
 import { BugRepository } from '../repositories/bugRepository';
+import { SprintRepository } from '../repositories/sprintRepository';
 import { CommentRepository } from '../repositories/commentRepository';
 import { ActivityRepository } from '../repositories/activityRepository';
 import { loadConfig, AppConfig } from '../utils/config';
@@ -32,6 +33,7 @@ export class ServiceContainer {
   private userRepository: UserRepository | null = null;
   private projectRepository: ProjectRepository | null = null;
   private bugRepository: BugRepository | null = null;
+  private sprintRepository: SprintRepository | null = null;
   private commentRepository: CommentRepository | null = null;
   private activityRepository: ActivityRepository | null = null;
   private config: AppConfig;
@@ -103,6 +105,19 @@ export class ServiceContainer {
       this.bugRepository = new BugRepository(this.initializeCollectionDB());
     }
     return this.bugRepository;
+  }
+
+  /**
+   * Gets the SprintRepository instance (lazy initialization)
+   * @returns SprintRepository for sprint data operations
+   */
+  getSprintRepository(): SprintRepository {
+    this.ensureActive();
+    if (!this.sprintRepository) {
+      logger.debug('Lazy initializing SprintRepository');
+      this.sprintRepository = new SprintRepository(this.initializeCollectionDB());
+    }
+    return this.sprintRepository;
   }
 
   /**
@@ -190,6 +205,7 @@ export class ServiceContainer {
       this.userRepository = null;
       this.projectRepository = null;
       this.bugRepository = null;
+      this.sprintRepository = null;
       this.commentRepository = null;
       this.activityRepository = null;
       this.collectionDb = null;

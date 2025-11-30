@@ -8,6 +8,109 @@
  */
 
 import { AxiosError } from 'axios';
+import { FilterQuery } from '../lib/services/collectionDb';
+
+/**
+ * Constructs server-side filter array from UI filter state
+ */
+export const constructBugFilters = (filters: {
+  projectId?: string;
+  status?: string;
+  assignedTo?: string;
+  priority?: string;
+  severity?: string;
+  type?: string;
+  search?: string;
+  sprintId?: string | null;
+}): FilterQuery[] => {
+  const dbFilters: FilterQuery[] = [];
+
+  // Check if we are filtering by a specific sprint (not backlog)
+  // If so, we don't need to filter by project ID as sprint ID is unique
+  const isSpecificSprint = filters.sprintId && filters.sprintId !== 'all' && filters.sprintId !== 'backlog';
+
+  if (filters.projectId && filters.projectId !== 'all' && !isSpecificSprint) {
+    dbFilters.push({
+      field_name: 'payload.project_id',
+      field_value: filters.projectId,
+      operator: 'like',
+    });
+  }
+
+  if (filters.sprintId !== undefined && filters.sprintId !== 'all') {
+    if (filters.sprintId === 'backlog') {
+      dbFilters.push({
+        field_name: 'payload.sprint_id',
+        field_value: [],
+        operator: 'eq',
+      });
+    } else {
+      dbFilters.push({
+        field_name: 'payload.sprint_id',
+        field_value: filters.sprintId,
+        operator: 'like',
+      });
+    }
+  }
+
+  if (filters.status && filters.status !== 'all') {
+    dbFilters.push({
+      field_name: 'payload.status',
+      field_value: filters.status,
+      operator: 'eq',
+    });
+  }
+
+  if (filters.assignedTo && filters.assignedTo !== 'all') {
+      if (filters.assignedTo === 'unassigned') {
+          dbFilters.push({
+              field_name: 'payload.assigned_to',
+              field_value: null,
+              operator: 'eq',
+          });
+      } else {
+          dbFilters.push({
+              field_name: 'payload.assigned_to',
+              field_value: filters.assignedTo,
+              operator: 'eq',
+          });
+      }
+  }
+
+  if (filters.priority && filters.priority !== 'all') {
+    dbFilters.push({
+      field_name: 'payload.priority',
+      field_value: filters.priority,
+      operator: 'eq',
+    });
+  }
+
+  if (filters.severity && filters.severity !== 'all') {
+    dbFilters.push({
+      field_name: 'payload.severity',
+      field_value: filters.severity,
+      operator: 'eq',
+    });
+  }
+
+  if (filters.type && filters.type !== 'all') {
+    dbFilters.push({
+      field_name: 'payload.type',
+      field_value: filters.type,
+      operator: 'eq',
+    });
+  }
+
+  if (filters.search) {
+    dbFilters.push({
+      field_name: 'payload.title',
+      field_value: filters.search,
+      operator: 'eq',
+    });
+  }
+  
+  return dbFilters;
+};
 
 /**
  * Retry an async operation with delay between attempts

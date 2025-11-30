@@ -4,6 +4,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import { Sprint } from '../lib/models/sprint';
 import type {
   Bug,
   Comment,
@@ -22,6 +23,7 @@ import type {
   CommentResponse,
   ProjectResponse,
 } from './types';
+import { constructBugFilters } from './apiHelpers';
 
 // Track request count for loading state
 let activeRequests = 0;
@@ -193,11 +195,15 @@ export const bugApi = {
       status?: string;
       assignedTo?: string;
       priority?: string;
+      severity?: string;
+      type?: string;
       search?: string;
+      sprintId?: string | null;
     }
   ): Promise<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }> => {
     const params: Record<string, string> = {
       page_size: pageSize.toString(),
+      include_detail: 'false',
     };
 
     if (lastEvaluatedKey) {
@@ -205,11 +211,10 @@ export const bugApi = {
     }
 
     if (filters) {
-      if (filters.projectId && filters.projectId !== 'all') params.projectId = filters.projectId;
-      if (filters.status && filters.status !== 'all') params.status = filters.status;
-      if (filters.assignedTo && filters.assignedTo !== 'all') params.assignedTo = filters.assignedTo;
-      if (filters.priority && filters.priority !== 'all') params.priority = filters.priority;
-      if (filters.search) params.search = filters.search;
+      const filterArray = constructBugFilters(filters);
+      if (filterArray.length > 0) {
+        params.filters = JSON.stringify(filterArray);
+      }
     }
 
     const response = await apiClient.get<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }>('/api/bugs', {
@@ -277,6 +282,27 @@ export const bugApi = {
       response.data.bug = transformDates(response.data.bug);
     }
     return response.data;
+  },
+
+  /**
+   * Update bug sprint (admin only)
+   */
+  updateSprint: async (id: string, sprintId: string | null, userRole: string): Promise<BugResponse> => {
+    const response = await apiClient.patch<{ success: boolean, bug: BugResponse }>(`/api/bugs/${id}`, {
+      sprintId,
+      userRole,
+    });
+    return transformDates(response.data.bug);
+  },
+
+  /**
+   * Update bug tags
+   */
+  updateTags: async (id: string, tags: string[]): Promise<BugResponse> => {
+    const response = await apiClient.patch<{ success: boolean, bug: BugResponse }>(`/api/bugs/${id}`, {
+      tags,
+    });
+    return transformDates(response.data.bug);
   },
 };
 
@@ -363,6 +389,19 @@ export const activityLogApi = {
   getByBugId: async (bugId: string): Promise<ActivityLog[]> => {
     const response = await apiClient.get<ActivityLog[]>('/api/activities', {
       params: { bugId },
+    });
+    return response.data.map(transformDates);
+  },
+};
+
+// Sprint API endpoints
+export const sprintApi = {
+  /**
+   * Get sprints by project ID
+   */
+  getByProject: async (projectId: string): Promise<Sprint[]> => {
+    const response = await apiClient.get<Sprint[]>('/api/sprints', {
+      params: { projectId },
     });
     return response.data.map(transformDates);
   },

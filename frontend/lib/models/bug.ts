@@ -22,7 +22,18 @@ export enum BugSeverity {
   MINOR = 'Minor',
   MAJOR = 'Major',
   BLOCKER = 'Blocker',
+  // Suggestion severities
+  NICE_TO_HAVE = 'Nice to have',
+  MUST_HAVE = 'Must have',
+  STRATEGIC = 'Strategic',
+  // Epic/Task severities
+  TRIVIAL = 'Trivial',
+  MODERATE = 'Moderate',
+  HEAVY = 'Heavy',
+  MASSIVE = 'Massive',
 }
+
+export type BugType = 'bug' | 'epic' | 'task' | 'suggestion';
 
 /**
  * Predefined bug tags for categorization
@@ -59,6 +70,8 @@ export interface Bug {
   projectId: string;        // Relation to Project.id
   reportedBy: string;       // Relation to User.id
   assignedTo: string | null; // Relation to User.id (nullable)
+  sprintId?: string | null; // Relation to Sprint.id (nullable)
+  type: BugType;            // Work item type
   attachments: string;      // Comma-separated URLs or file paths
   tags: BugTag[];           // Array of predefined tags (can be multiple)
   validated: boolean;       // Whether bug has been validated by tester
@@ -67,5 +80,5 @@ export interface Bug {
 }
 
 export type CreateBugInput = Omit<Bug, 'id' | 'createdAt' | 'updatedAt'> &
-  Partial<Pick<Bug, 'status' | 'assignedTo' | 'attachments'>>;
+  Partial<Pick<Bug, 'status' | 'assignedTo' | 'attachments' | 'sprintId' | 'type'>>;
 export type UpdateBugInput = Partial<Omit<Bug, 'id' | 'createdAt' | 'updatedAt'>>;

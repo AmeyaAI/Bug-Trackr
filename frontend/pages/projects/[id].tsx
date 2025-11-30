@@ -7,25 +7,105 @@
  * Requirements: 5.2, 5.5
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PriorityIcon } from '@/components/PriorityIcon';
-import { SeverityIcon } from '@/components/SeverityIcon';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { bugApi, projectApi, userApi } from '@/utils/apiClient';
-import { Bug, BugStatus, BugPriority, Project, User } from '@/utils/types';
+import { Bug, BugStatus, BugPriority, Project, User, UserRole } from '@/utils/types';
+import { BugType } from '@/lib/models/bug';
 import { useUser } from '@/contexts/UserContext';
+import { LoadingState } from '@/components/LoadingState';
+import { ApiErrorFallback } from '@/components/ApiErrorFallback';
 import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName } from '@/utils/badgeHelpers';
+import { CreateSprintDialog } from '@/components/SprintManagement/CreateSprintDialog';
+import { LayoutGrid, List, Filter, ChevronsUpDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  TableBody,
+  TableCell,
+  TableColumnHeader,
+  TableHead,
+  TableHeader,
+  TableProvider,
+  TableRow,
+  TableHeaderGroup,
+} from '@/components/ui/shadcn-io/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
+import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import { ColumnDef } from '@tanstack/react-table';
+
+// Bug type display helper
+const BUG_TYPE_CONFIG: Record<BugType, { label: string; icon: React.ReactNode; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
+  bug: { 
+    label: 'Bug', 
+    icon: (
+      <svg 
+        fill="currentColor" 
+        className="h-3 w-3"
+        version="1.1" 
+        xmlns="http://www.w3.org/2000/svg" 
+        viewBox="0 0 314.009 314.009"
+      >
+        <path d="M310.008,242.584l-44.275-39.615c-3.384-3.029-8.188-3.889-12.41-2.221l-3.699,1.461c1.719-8.662,2.636-17.699,2.636-26.998
+          c0-17.793-3.337-34.645-9.291-49.691l12.276-4.844L294,155.355c2.29,2.049,5.151,3.059,8.001,3.059c3.297,0,6.578-1.35,8.949-4
+          c4.421-4.939,4-12.529-0.94-16.949l-44.275-39.619c-3.384-3.029-8.186-3.889-12.411-2.221l-21.385,8.439
+          c-9.646-14.848-22.246-26.75-36.725-34.428l8.195-18.98l33.799,12.068c6.243,2.23,13.111-1.023,15.341-7.269
+          c2.23-6.242-1.024-13.111-7.268-15.34l-44.395-15.851c-5.959-2.129-12.548,0.736-15.057,6.545l-13.262,30.713
+          c-5.065-1.008-10.263-1.539-15.563-1.539s-10.499,0.531-15.564,1.539l-13.263-30.713c-2.508-5.811-9.099-8.674-15.058-6.545
+          L68.73,40.115c-6.243,2.229-9.497,9.098-7.268,15.342c2.229,6.242,9.1,9.498,15.342,7.268l33.793-12.068l8.196,18.982
+          c-14.477,7.678-27.076,19.58-36.723,34.424l-21.382-8.438c-4.223-1.666-9.026-0.809-12.41,2.221L4.001,137.465
+          c-4.941,4.42-5.363,12.008-0.941,16.949c2.371,2.65,5.653,4,8.949,4c2.85,0,5.71-1.01,8-3.059l38.759-34.68l12.273,4.844
+          c-5.955,15.047-9.292,31.897-9.292,49.691c0,9.299,0.917,18.336,2.636,26.996l-3.694-1.459c-4.225-1.666-9.026-0.807-12.41,2.221
+          L4.001,242.584c-4.94,4.42-5.363,12.01-0.942,16.949c2.371,2.65,5.653,4,8.95,4c2.85,0,5.71-1.008,8-3.057l38.759-34.678
+          l15.255,6.02c16.35,34.998,47.385,58.629,82.981,58.629c35.601,0,66.634-23.631,82.981-58.627l15.26-6.021l38.756,34.676
+          c2.291,2.051,5.15,3.059,8,3.059c3.297,0,6.579-1.35,8.949-4C315.371,254.594,314.949,247.004,310.008,242.584z M119.239,138.14
+          c0-8.586,6.967-15.553,15.563-15.553c8.593,0,15.559,6.967,15.559,15.553c0,8.588-6.966,15.551-15.559,15.551
+          C126.206,153.691,119.239,146.728,119.239,138.14z M150.36,231.719c-8.595,0-15.559-6.973-15.559-15.557s6.964-15.547,15.559-15.547
+          c8.585,0,15.552,6.963,15.552,15.547S158.945,231.719,150.36,231.719z M180.98,173.492c0-9.606,7.802-17.396,17.414-17.396
+          c9.614,0,17.405,7.791,17.405,17.396c0,9.621-7.791,17.41-17.405,17.41C188.782,190.902,180.98,183.113,180.98,173.492z"/>
+      </svg>
+    ), 
+    variant: 'destructive' 
+  },
+  epic: { 
+    label: 'Epic', 
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" className="h-3 w-3" viewBox="0 0 16 16">
+        <path clipRule="evenodd" d="m10.271.050656c.2887.111871.479.38969.479.699344v4.63515l3.1471.62941c.2652.05303.4812.24469.5655.50161s.0238.53933-.1584.73914l-7.74997 8.49999c-.20863.2288-.53644.3059-.82517.194-.28874-.1118-.47905-.3896-.47905-.6993v-4.6351l-3.14708-.62947c-.26515-.05303-.48123-.24468-.56553-.5016-.08431-.25692-.02379-.53933.1584-.73915l7.75-8.499996c.20863-.2288201.53643-.305899.8252-.194028zm-6.57276 8.724134 3.05177.61036v3.92915l5.55179-6.08909-3.05179-.61036v-3.9291z" fill="#bf63f3" fillRule="evenodd" />
+      </svg>
+    ), 
+    variant: 'outline',
+    className: "bg-purple-50 text-purple-600 hover:bg-purple-100 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:hover:bg-purple-900 dark:border-purple-800"
+  },
+  task: { 
+    label: 'Task', 
+    icon: (
+      <svg className="h-3 w-3" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#4A9EFF" fillRule="evenodd" d="M4,4 L9,4 C9.55228,4 10,3.55228 10,3 C10,2.44772 9.55228,2 9,2 L4,2 C2.89543,2 2,2.89543 2,4 L2,12 C2,13.1046 2.89543,14 4,14 L12,14 C13.1046,14 14,13.1046 14,12 L14,10 C14,9.44771 13.5523,9 13,9 C12.4477,9 12,9.44771 12,10 L12,12 L4,12 L4,4 Z M15.2071,2.29289 C14.8166,1.90237 14.1834,1.90237 13.7929,2.29289 L8.5,7.58579 L7.70711,6.79289 C7.31658,6.40237 6.68342,6.40237 6.29289,6.79289 C5.90237,7.18342 5.90237,7.81658 6.29289,8.20711 L7.79289,9.70711 C7.98043,9.89464 8.23478,10 8.5,10 C8.76522,10 9.01957,9.89464 9.20711,9.70711 L15.2071,3.70711 C15.5976,3.31658 15.5976,2.68342 15.2071,2.29289 Z"/>
+      </svg>
+    ), 
+    variant: 'secondary' 
+  },
+  suggestion: { 
+    label: 'Suggestion', 
+    icon: (
+      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6V17.4C21 17.7314 20.7314 18 20.4 18H16.2592C16.0938 18 15.9357 18.0683 15.8223 18.1888L12.4369 21.7858C12.2 22.0375 11.8 22.0375 11.5631 21.7858L8.17768 18.1888C8.06429 18.0683 7.90619 18 7.74076 18H3.6C3.26863 18 3 17.7314 3 17.4V3.6Z" stroke="#10B981" strokeWidth="1.5"/>
+        <path d="M12 7L13.4254 9.57457L16 11L13.4254 12.4254L12 15L10.5746 12.4254L8 11L10.5746 9.57457L12 7Z" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ), 
+    variant: 'outline' 
+  },
+};
 
 export default function ProjectBugsPage() {
   const router = useRouter();
@@ -35,59 +115,88 @@ export default function ProjectBugsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+  const [dragStartStatus, setDragStartStatus] = useState<BugStatus | null>(null);
+
+  // Pagination states
+  const [page, setPage] = useState(1);
+  const [cursors, setCursors] = useState<(string | null)[]>([null]);
+  const cursorsRef = useRef(cursors);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
-    if (projectId && typeof projectId === 'string') {
-      loadData(projectId);
-    }
-  }, [projectId]);
+    cursorsRef.current = cursors;
+  }, [cursors]);
 
-  const loadData = async (projId: string) => {
+  const loadData = useCallback(async (targetPage: number = 1, overrideCursor?: string | null) => {
+    if (!projectId || typeof projectId !== 'string') return;
+    
     setIsLoading(true);
     setError(null);
     
     try {
-      const [projectData, allBugs, usersData] = await Promise.all([
-        projectApi.getById(projId),
-        bugApi.getAll(),
-        userApi.getAll(),
+      const cursorToUse = overrideCursor !== undefined ? overrideCursor : cursorsRef.current[targetPage - 1];
+
+      const [projectData, bugsData, usersData] = await Promise.all([
+        project ? Promise.resolve(project) : projectApi.getById(projectId),
+        bugApi.getPaginated(PAGE_SIZE, cursorToUse || undefined, {
+          projectId: projectId,
+          status: statusFilter,
+          assignedTo: assigneeFilter,
+          priority: priorityFilter,
+          type: typeFilter,
+          search: searchQuery
+        }),
+        users.length ? Promise.resolve(users) : userApi.getAll(),
       ]);
       
-      setProject(projectData);
-      // Filter bugs for this project
-      const projectBugs = allBugs.filter(bug => bug.projectId === projId);
-      setBugs(projectBugs);
-      setUsers(usersData);
+      if (!project) setProject(projectData);
+      setBugs(bugsData.bugs);
+      if (!users.length) setUsers(usersData);
       
-      // Load comment counts for each bug
-      const counts: Record<string, number> = {};
-      await Promise.all(
-        projectBugs.map(async (bug) => {
-          try {
-            const bugWithComments = await bugApi.getById(bug.id);
-            counts[bug.id] = bugWithComments.comments.length;
-          } catch (err) {
-            console.error(`Failed to load comments for bug ${bug.id}:`, err);
-            counts[bug.id] = 0;
+      setPage(targetPage);
+      
+      if (bugsData.lastEvaluatedKey) {
+        const nextCursor = JSON.stringify(bugsData.lastEvaluatedKey);
+        setCursors(prev => {
+          if (overrideCursor === null) {
+            return [null, nextCursor];
           }
-        })
-      );
-      setCommentCounts(counts);
+          const newCursors = [...prev];
+          newCursors[targetPage] = nextCursor;
+          return newCursors;
+        });
+        setHasMore(true);
+      } else {
+        setHasMore(false);
+        if (overrideCursor === null) {
+          setCursors([null]);
+        }
+      }
     } catch (err) {
       console.error('Failed to load project data:', err);
       setError('Failed to load project data. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [projectId, statusFilter, assigneeFilter, priorityFilter, typeFilter, searchQuery, project, users]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadData(1, null);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [loadData]);
 
   const handleViewDetails = (bugId: string) => {
     router.push(`/bugs/${bugId}`);
@@ -102,18 +211,10 @@ export default function ProjectBugsPage() {
     router.push('/projects');
   };
 
-  // Filter bugs based on selected filters
-  const filteredBugs = bugs.filter(bug => {
-    const matchesStatus = statusFilter === 'all' || bug.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || bug.priority === priorityFilter;
-    const matchesSearch = searchQuery === '' || 
-      bug.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      bug.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesStatus && matchesPriority && matchesSearch;
-  });
+  // With server-side pagination, bugs are already filtered
+  const filteredBugs = bugs;
 
-  // Calculate project statistics
+  // Calculate project statistics based on currently loaded bugs
   const getProjectStats = () => {
     const total = bugs.length;
     const open = bugs.filter(b => b.status === BugStatus.OPEN).length;
@@ -125,33 +226,297 @@ export default function ProjectBugsPage() {
     return { total, open, inProgress, resolved, closed, highest };
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading project...</p>
-          </div>
+  // Define table columns with filter dropdowns
+  const columns: ColumnDef<Bug>[] = [
+    {
+      accessorKey: 'title',
+      header: ({ column }) => (
+        <TableColumnHeader column={column} title="Title" className="text-base" />
+      ),
+      cell: ({ row }) => <div className="font-medium text-foreground text-base">{row.getValue('title')}</div>,
+    },
+    {
+      accessorKey: 'type',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Type</span>
+                {typeFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setTypeFilter('all')}>
+                All Types
+              </DropdownMenuItem>
+              {(['bug', 'epic', 'task', 'suggestion'] as BugType[]).map((type) => (
+                <DropdownMenuItem key={type} onClick={() => setTypeFilter(type)}>
+                  <Badge variant={BUG_TYPE_CONFIG[type].variant} className={`${BUG_TYPE_CONFIG[type].className || ''} mr-2 flex items-center gap-1`}>
+                    {BUG_TYPE_CONFIG[type].icon}
+                    {BUG_TYPE_CONFIG[type].label}
+                  </Badge>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
-    );
+      ),
+      cell: ({ row }) => {
+        const type = row.getValue('type') as BugType;
+        const config = BUG_TYPE_CONFIG[type] || BUG_TYPE_CONFIG.bug;
+        return (
+          <Badge variant={config.variant} className={`${config.className || ''} flex items-center gap-1 w-fit text-sm px-2 py-1`}>
+            {config.icon}
+            {config.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'priority',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Priority</span>
+                {priorityFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setPriorityFilter('all')}>
+                All Priorities
+              </DropdownMenuItem>
+              {Object.values(BugPriority).map((priority) => (
+                <DropdownMenuItem key={priority} onClick={() => setPriorityFilter(priority)}>
+                  <Badge variant={getPriorityBadgeVariant(priority)} className="mr-2 flex items-center gap-1">
+                    <PriorityIcon priority={priority} />
+                    {priority}
+                  </Badge>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const priority = row.getValue('priority') as BugPriority;
+        return (
+          <Badge variant={getPriorityBadgeVariant(priority)} className="flex items-center gap-1 w-fit text-sm px-2 py-1">
+            <PriorityIcon priority={priority} />
+            {priority}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Status</span>
+                {statusFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setStatusFilter('all')}>
+                All Statuses
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.OPEN)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.OPEN)} className="mr-2">{BugStatus.OPEN}</Badge>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.IN_PROGRESS)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.IN_PROGRESS)} className="mr-2">{BugStatus.IN_PROGRESS}</Badge>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.RESOLVED)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.RESOLVED)} className="mr-2">{BugStatus.RESOLVED}</Badge>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter(BugStatus.CLOSED)}>
+                <Badge variant={getStatusBadgeVariant(BugStatus.CLOSED)} className="mr-2">{BugStatus.CLOSED}</Badge>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue('status') as BugStatus;
+        return (
+          <Badge variant={getStatusBadgeVariant(status)} className="text-sm px-2 py-1">
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: 'assignedTo',
+      header: () => (
+        <div className="flex items-center space-x-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-3 h-8 data-[state=open]:bg-accent text-base"
+              >
+                <span>Assignee</span>
+                {assigneeFilter !== 'all' ? (
+                  <Filter className="ml-2 h-4 w-4" />
+                ) : (
+                  <ChevronsUpDownIcon className="ml-2 h-4 w-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setAssigneeFilter('all')}>
+                All Assignees
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAssigneeFilter('unassigned')}>
+                 Unassigned
+              </DropdownMenuItem>
+              {users.map((user) => (
+                <DropdownMenuItem key={user.id} onClick={() => setAssigneeFilter(user.id)}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span>{user.name}</span>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const assignedTo = row.getValue('assignedTo') as string | undefined;
+        return (
+          <div className="flex items-center gap-2">
+            {assignedTo ? (
+              <>
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                  {getUserName(assignedTo, users).charAt(0).toUpperCase()}
+                </div>
+                <span className="text-base">{getUserName(assignedTo, users)}</span>
+              </>
+            ) : (
+              <span className="text-base text-muted-foreground">Unassigned</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'createdAt',
+      header: ({ column }) => (
+        <TableColumnHeader column={column} title="Created" className="text-base" />
+      ),
+      cell: ({ row }) => (
+        <span className="text-base text-muted-foreground">
+          {formatRelativeTime(row.getValue('createdAt'))}
+        </span>
+      ),
+    },
+  ];
+
+  const kanbanColumns = [
+    { id: BugStatus.OPEN, name: 'Open' },
+    { id: BugStatus.IN_PROGRESS, name: 'In Progress' },
+    { id: BugStatus.RESOLVED, name: 'Resolved' },
+    { id: BugStatus.CLOSED, name: 'Closed' },
+  ];
+
+  const handleKanbanDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const currentColumn = active.data.current?.column as BugStatus;
+    if (currentColumn) {
+      setDragStartStatus(currentColumn);
+    }
+  };
+
+  const handleKanbanDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over) {
+      setDragStartStatus(null);
+      return;
+    }
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const oldStatus = dragStartStatus;
+    setDragStartStatus(null);
+
+    const bug = bugs.find(b => b.id === activeId);
+    if (!bug) return;
+
+    let newStatus: BugStatus | undefined;
+
+    if (Object.values(BugStatus).includes(overId as BugStatus)) {
+      newStatus = overId as BugStatus;
+    } else {
+      const overBug = bugs.find(b => b.id === overId);
+      if (overBug) {
+        newStatus = overBug.status;
+      }
+    }
+
+    if (newStatus && oldStatus && newStatus !== oldStatus) {
+      try {
+        if (currentUser) {
+          await bugApi.updateStatus(bug.id, { 
+            status: newStatus,
+            userId: currentUser.id,
+            userRole: currentUser.role as UserRole
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update bug status:', error);
+        loadData();
+      }
+    }
+  };
+
+  if (isLoading && !project) {
+    return <LoadingState message="Loading project..." fullScreen />;
   }
 
   if (error || !project) {
     return (
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center justify-center h-64 gap-4">
-            <p className="text-destructive">{error || 'Project not found'}</p>
-            <div className="flex gap-2">
-              <Button onClick={() => projectId && typeof projectId === 'string' && loadData(projectId)}>
-                Retry
-              </Button>
-              <Button variant="outline" onClick={handleBackToProjects}>
-                Back to Projects
-              </Button>
-            </div>
-          </div>
+          <ApiErrorFallback
+            error={new Error(error || 'Project not found')}
+            onRetry={() => loadData(1, null)}
+            title="Failed to load project"
+          />
         </div>
       </div>
     );
@@ -178,9 +543,15 @@ export default function ProjectBugsPage() {
                 <p className="text-muted-foreground mt-2">{project.description}</p>
               </div>
               {currentUser && (
-                <Button onClick={handleCreateBug}>
-                  Create Bug
-                </Button>
+                <div className="flex gap-2">
+                  <CreateSprintDialog 
+                    projectId={project.id} 
+                    onSprintCreated={() => loadData(1, null)} 
+                  />
+                  <Button onClick={handleCreateBug}>
+                    Create Bug
+                  </Button>
+                </div>
               )}
             </div>
           </CardHeader>
@@ -214,7 +585,37 @@ export default function ProjectBugsPage() {
           </CardContent>
         </Card>
 
-        {/* Filters */}
+        {/* Header with view toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Project Bugs</h2>
+            <p className="text-muted-foreground text-sm mt-1">
+              Manage bugs for this project
+            </p>
+          </div>
+          <div className="flex items-center border rounded-md p-1 bg-muted/20">
+            <Button
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="h-8 px-3"
+            >
+              <List className="h-4 w-4 mr-2" />
+              Table
+            </Button>
+            <Button
+              variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('kanban')}
+              className="h-8 px-3"
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Kanban
+            </Button>
+          </div>
+        </div>
+
+        {/* Search filter */}
         <div className="flex flex-col sm:flex-row gap-4">
           <Input
             placeholder="Search bugs..."
@@ -222,159 +623,136 @@ export default function ProjectBugsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="sm:max-w-xs"
           />
-          
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="sm:w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value={BugStatus.OPEN}>{BugStatus.OPEN}</SelectItem>
-              <SelectItem value={BugStatus.IN_PROGRESS}>{BugStatus.IN_PROGRESS}</SelectItem>
-              <SelectItem value={BugStatus.RESOLVED}>{BugStatus.RESOLVED}</SelectItem>
-              <SelectItem value={BugStatus.CLOSED}>{BugStatus.CLOSED}</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="sm:w-[180px]">
-              <SelectValue placeholder="Filter by priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value={BugPriority.HIGHEST}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.HIGHEST} />
-                  {BugPriority.HIGHEST}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.HIGH}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.HIGH} />
-                  {BugPriority.HIGH}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.MEDIUM}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.MEDIUM} />
-                  {BugPriority.MEDIUM}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.LOW}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.LOW} />
-                  {BugPriority.LOW}
-                </div>
-              </SelectItem>
-              <SelectItem value={BugPriority.LOWEST}>
-                <div className="flex items-center gap-2">
-                  <PriorityIcon priority={BugPriority.LOWEST} />
-                  {BugPriority.LOWEST}
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Results count */}
         <div className="text-sm text-muted-foreground">
-          Showing {filteredBugs.length} of {bugs.length} bugs in this project
+          Showing {filteredBugs.length} bugs on this page (Page {page})
         </div>
 
-        {/* Bug list */}
-        {filteredBugs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
-            <p className="text-muted-foreground">
-              {bugs.length === 0 ? 'No bugs in this project yet' : 'No bugs match your filters'}
-            </p>
-            <Button variant="outline" onClick={handleCreateBug}>
-              Create First Bug
-            </Button>
+        {viewMode === 'table' ? (
+          /* Bug table */
+          <div className="bg-card rounded-lg border">
+            <TableProvider columns={columns} data={filteredBugs}>
+              <TableHeader>
+                {({ headerGroup }) => (
+                  <TableHeaderGroup key={headerGroup.id} headerGroup={headerGroup}>
+                    {({ header }) => <TableHead key={header.id} header={header} className="h-12" />}
+                  </TableHeaderGroup>
+                )}
+              </TableHeader>
+              <TableBody emptyContent={
+                <div className="flex flex-col items-center justify-center py-16 gap-4">
+                  <p className="text-muted-foreground">No bugs found</p>
+                  <Button variant="outline" onClick={handleCreateBug}>
+                    Create First Bug
+                  </Button>
+                </div>
+              }>
+                {({ row }) => (
+                  <TableRow
+                    key={row.id}
+                    row={row}
+                    className="cursor-pointer hover:bg-muted/30"
+                    onClick={() => handleViewDetails((row.original as Bug).id)}
+                  >
+                    {({ cell }) => (
+                      <TableCell key={cell.id} cell={cell} className="p-4" />
+                    )}
+                  </TableRow>
+                )}
+              </TableBody>
+            </TableProvider>
           </div>
         ) : (
-          <div className="bg-card rounded-lg border">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Title</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Priority</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Severity</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Assignee</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Comments</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBugs.map((bug) => (
-                    <tr 
-                      key={bug.id} 
-                      className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                      onClick={() => handleViewDetails(bug.id)}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-foreground max-w-md truncate">{bug.title}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Badge variant={getPriorityBadgeVariant(bug.priority)} className="flex items-center gap-1 w-fit">
-                          <PriorityIcon priority={bug.priority} />
-                          {bug.priority}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Badge variant={getStatusBadgeVariant(bug.status)}>
-                          {bug.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <SeverityIcon severity={bug.severity} />
-                          <span className="text-sm text-muted-foreground">{bug.severity}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {bug.assignedTo ? (
-                            <>
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
-                                {getUserName(bug.assignedTo, users).charAt(0).toUpperCase()}
+          /* Kanban Board */
+          <div className="h-[calc(100vh-400px)] min-h-[500px]">
+            <KanbanProvider
+              columns={kanbanColumns}
+              data={filteredBugs.map(b => ({ ...b, name: b.title, column: b.status }))}
+              onDataChange={(newData) => {
+                const updatedBugsMap = new Map(newData.map(item => [item.id, item]));
+                
+                setBugs(prevBugs => prevBugs.map(bug => {
+                  const updatedItem = updatedBugsMap.get(bug.id);
+                  if (updatedItem) {
+                    return { ...bug, status: updatedItem.column as BugStatus };
+                  }
+                  return bug;
+                }));
+              }}
+              onDragStart={handleKanbanDragStart}
+              onDragEnd={handleKanbanDragEnd}
+            >
+              {(column) => (
+                <KanbanBoard key={column.id} id={column.id}>
+                  <KanbanHeader>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{column.name}</span>
+                      <Badge variant="secondary" className="ml-2">
+                        {filteredBugs.filter(b => b.status === column.id).length}
+                      </Badge>
+                    </div>
+                  </KanbanHeader>
+                  <KanbanCards id={column.id}>
+                    {(item) => {
+                      const bug = item as unknown as Bug;
+                      const typeConfig = BUG_TYPE_CONFIG[bug.type] || BUG_TYPE_CONFIG.bug;
+                      return (
+                        <KanbanCard key={bug.id} id={bug.id} name={bug.title} column={bug.status} className="cursor-pointer" onClick={() => handleViewDetails(bug.id)}>
+                          <div className="flex flex-col gap-2">
+                            <div className="font-medium text-sm">{bug.title}</div>
+                            <div className="flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-1">
+                                <Badge variant={getPriorityBadgeVariant(bug.priority)} className="text-[10px] px-1 py-0 h-5">
+                                  {bug.priority}
+                                </Badge>
+                                <Badge variant={typeConfig.variant} className={`${typeConfig.className || ''} text-[10px] px-1 py-0 h-5 flex items-center gap-0.5`}>
+                                  {typeConfig.icon}
+                                  {typeConfig.label}
+                                </Badge>
                               </div>
-                              <span className="text-sm truncate max-w-[120px]">{getUserName(bug.assignedTo, users)}</span>
-                            </>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Unassigned</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                          </svg>
-                          <span>{commentCounts[bug.id] || 0}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">
-                        {formatRelativeTime(bug.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                              {bug.assignedTo && (
+                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium" title={getUserName(bug.assignedTo, users)}>
+                                  {getUserName(bug.assignedTo, users).charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </KanbanCard>
+                      );
+                    }}
+                  </KanbanCards>
+                </KanbanBoard>
+              )}
+            </KanbanProvider>
           </div>
         )}
+
+        {/* Pagination */}
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadData(page - 1)}
+            disabled={page === 1 || isLoading}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <div className="text-sm font-medium">
+            Page {page}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadData(page + 1)}
+            disabled={!hasMore || isLoading}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

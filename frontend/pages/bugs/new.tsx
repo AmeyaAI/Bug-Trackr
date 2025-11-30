@@ -34,9 +34,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { bugApi, projectApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
+import { bugApi, projectApi, sprintApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
 import { BugPriority, BugSeverity, Project } from "@/utils/types";
-import { BugTag, ALL_BUG_TAGS } from "@/lib/models/bug";
+import { Sprint } from "@/lib/models/sprint";
+import { BugTag, ALL_BUG_TAGS, BugType } from "@/lib/models/bug";
 import { useUser } from "@/contexts/UserContext";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
@@ -53,6 +54,7 @@ interface BugFormData {
   severity: BugSeverity;
   type: BugTag; // Epic, Task, Suggestion, or Bug type
   tags: BugTag[]; // Additional bug tags (BUG_FRONTEND, BUG_BACKEND, etc.)
+  sprintId?: string;
 }
 
 export default function NewBugPage() {
@@ -61,7 +63,9 @@ export default function NewBugPage() {
   const toast = useToast();
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [isLoadingSprints, setIsLoadingSprints] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBugTypeDialog, setShowBugTypeDialog] = useState(true);
   const [preSelectedTag, setPreSelectedTag] = useState<BugTag | null>(null);
@@ -81,14 +85,41 @@ export default function NewBugPage() {
       severity: BugSeverity.MAJOR,
       type: "" as BugTag, // Will be set from dialog
       tags: [],
+      sprintId: "unassigned",
     },
   });
 
   const selectedProjectId = watch("projectId");
+  const selectedSprintId = watch("sprintId");
   const selectedPriority = watch("priority");
   const selectedSeverity = watch("severity");
   const selectedType = watch("type");
   const selectedTags = watch("tags");
+
+  // Helper to get allowed severities based on type
+  const getSeveritiesForType = useCallback((type: BugTag): BugSeverity[] => {
+    switch (type) {
+      case BugTag.SUGGESTION:
+        return [BugSeverity.NICE_TO_HAVE, BugSeverity.MUST_HAVE, BugSeverity.STRATEGIC];
+      case BugTag.EPIC:
+      case BugTag.TASK:
+        return [BugSeverity.TRIVIAL, BugSeverity.MODERATE, BugSeverity.HEAVY, BugSeverity.MASSIVE];
+      default:
+        // For all bug types and default
+        return [BugSeverity.MINOR, BugSeverity.MAJOR, BugSeverity.BLOCKER];
+    }
+  }, []);
+
+  // Update severity when type changes to ensure validity
+  useEffect(() => {
+    if (!selectedType) return;
+    
+    const allowedSeverities = getSeveritiesForType(selectedType);
+    // If current severity is not in the allowed list, reset to the first allowed value
+    if (!allowedSeverities.includes(selectedSeverity)) {
+      setValue("severity", allowedSeverities[0]);
+    }
+  }, [selectedType, getSeveritiesForType, selectedSeverity, setValue]);
 
   const loadProjects = useCallback(async () => {
     setIsLoadingProjects(true);
@@ -108,6 +139,28 @@ export default function NewBugPage() {
     loadProjects();
   }, [loadProjects]);
 
+  useEffect(() => {
+    const loadSprints = async () => {
+      if (!selectedProjectId) {
+        setSprints([]);
+        setValue("sprintId", "unassigned");
+        return;
+      }
+      setIsLoadingSprints(true);
+      try {
+        const sprintsData = await sprintApi.getByProject(selectedProjectId);
+        setSprints(sprintsData);
+        setValue("sprintId", "unassigned");
+      } catch (err) {
+        console.error("Failed to load sprints:", err);
+        toast.error("Failed to load sprints");
+      } finally {
+        setIsLoadingSprints(false);
+      }
+    };
+    loadSprints();
+  }, [selectedProjectId, toast, setValue]);
+
   // Pre-select project from query parameter
   useEffect(() => {
     if (router.query.projectId && typeof router.query.projectId === "string") {
@@ -124,8 +177,11 @@ export default function NewBugPage() {
     setIsSubmitting(true);
 
     try {
-      // Combine type with additional tags for storage
-      const allTags = [data.type, ...data.tags];
+      // Map BugTag to BugType
+      let bugType: BugType = 'bug';
+      if (data.type === BugTag.EPIC) bugType = 'epic';
+      else if (data.type === BugTag.TASK) bugType = 'task';
+      else if (data.type === BugTag.SUGGESTION) bugType = 'suggestion';
       
       const newBug = await bugApi.create({
         title: data.title,
@@ -134,7 +190,9 @@ export default function NewBugPage() {
         reportedBy: currentUser.id,
         priority: data.priority,
         severity: data.severity,
-        tags: allTags,
+        type: bugType,
+        tags: data.tags,
+        sprintId: data.sprintId === 'unassigned' ? null : (data.sprintId || null),
       });
 
       toast.success("Bug created successfully!");
@@ -409,6 +467,32 @@ export default function NewBugPage() {
                   )}
                 </div>
 
+                {/* Sprint selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="sprintId">
+                    Sprint (Optional)
+                  </Label>
+                  <Select
+                    value={selectedSprintId}
+                    onValueChange={(value) =>
+                      setValue("sprintId", value)
+                    }
+                    disabled={!selectedProjectId || isLoadingSprints}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={!selectedProjectId ? "Select a project first" : "Select a sprint"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Backlog (No Sprint)</SelectItem>
+                      {sprints.map((sprint) => (
+                        <SelectItem key={sprint.id} value={sprint.id}>
+                          {sprint.name} ({sprint.status})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Type selection */}
                 <div className="space-y-2">
                   <Label htmlFor="type">
@@ -521,24 +605,14 @@ export default function NewBugPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={BugSeverity.MINOR}>
-                        <div className="flex items-center gap-2">
-                          <SeverityIcon severity={BugSeverity.MINOR} />
-                          {BugSeverity.MINOR}
-                        </div>
-                      </SelectItem>
-                      <SelectItem value={BugSeverity.MAJOR}>
-                        <div className="flex items-center gap-2">
-                          <SeverityIcon severity={BugSeverity.MAJOR} />
-                          {BugSeverity.MAJOR}
-                        </div>
-                      </SelectItem>
-                      <SelectItem value={BugSeverity.BLOCKER}>
-                        <div className="flex items-center gap-2">
-                          <SeverityIcon severity={BugSeverity.BLOCKER} />
-                          {BugSeverity.BLOCKER}
-                        </div>
-                      </SelectItem>
+                      {getSeveritiesForType(selectedType).map((severity) => (
+                        <SelectItem key={severity} value={severity}>
+                          <div className="flex items-center gap-2">
+                            <SeverityIcon severity={severity} />
+                            {severity}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

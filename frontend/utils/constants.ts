@@ -17,16 +17,25 @@ export const BADGE_VARIANTS = {
     Closed: 'outline' as const,
   },
   PRIORITY: {
-    Highest: 'destructive' as const,
-    High: 'destructive' as const,
-    Medium: 'default' as const,
-    Low: 'default' as const,
-    Lowest: 'secondary' as const,
+    Highest: 'priority-highest' as const,
+    High: 'priority-high' as const,
+    Medium: 'priority-medium' as const,
+    Low: 'priority-low' as const,
+    Lowest: 'priority-lowest' as const,
   },
   SEVERITY: {
     Blocker: 'destructive' as const,
     Major: 'default' as const,
     Minor: 'secondary' as const,
+    // Suggestion
+    'Nice to have': 'secondary' as const,
+    'Must have': 'default' as const,
+    Strategic: 'default' as const,
+    // Epic/Task
+    Trivial: 'outline' as const,
+    Moderate: 'secondary' as const,
+    Heavy: 'default' as const,
+    Massive: 'destructive' as const,
   },
   ROLE: {
     admin: 'destructive' as const,

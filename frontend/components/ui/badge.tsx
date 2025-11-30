@@ -16,10 +16,11 @@ const badgeVariants = cva(
         "status-closed": "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700",
         
         // Priority badges with dark mode
-        "priority-low": "bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700",
-        "priority-medium": "bg-yellow-50 text-yellow-600 hover:bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-400 dark:hover:bg-yellow-900",
-        "priority-high": "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900",
-        "priority-critical": "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800",
+        "priority-lowest": "bg-blue-500/20 text-blue-700 hover:bg-blue-500/30 dark:bg-blue-500/30 dark:text-blue-300 dark:hover:bg-blue-500/40",
+        "priority-low": "bg-sky-400/20 text-sky-700 hover:bg-sky-400/30 dark:bg-sky-400/30 dark:text-sky-300 dark:hover:bg-sky-400/40",
+        "priority-medium": "bg-amber-400/20 text-amber-700 hover:bg-amber-400/30 dark:bg-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/40",
+        "priority-high": "bg-red-400/20 text-red-700 hover:bg-red-400/30 dark:bg-red-400/30 dark:text-red-300 dark:hover:bg-red-400/40",
+        "priority-highest": "bg-red-600/25 text-red-800 hover:bg-red-600/35 dark:bg-red-600/35 dark:text-red-200 dark:hover:bg-red-600/45",
         
         // Severity badges with dark mode
         "severity-minor": "bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900",
@@ -44,7 +45,7 @@ function Badge({
   variant,
   asChild = false,
   ...props
-}: React.ComponentProps<"span"> &
+}: React.HTMLAttributes<HTMLSpanElement> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "span"
 

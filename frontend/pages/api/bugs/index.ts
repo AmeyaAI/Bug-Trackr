@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { getServiceContainer } from '@/lib/services/serviceContainer';
+import { FilterQuery } from '@/lib/services';
 import { createBugSchema } from '@/lib/utils/validation';
 import { BugStatus, BugPriority } from '@/lib/models/bug';
 import { ActivityAction } from '@/lib/models/activity';
@@ -36,7 +37,26 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const services = getServiceContainer();
     const bugRepo = services.getBugRepository();
     
-    const { projectId, status, assignedTo, priority, search, page_size, last_evaluated_key } = req.query;
+    const { projectId, status, assignedTo, priority, search, page_size, last_evaluated_key, filters } = req.query;
+
+    // Server-Side Filtering (PRD Requirement 4.1)
+    if (filters) {
+      const pageSize = page_size ? parseInt(page_size as string, 10) : 10;
+      const lastEvaluatedKey = last_evaluated_key as string;
+      
+      let parsedFilter: FilterQuery[] = [];
+      try {
+        parsedFilter = JSON.parse(filters as string);
+      } catch {
+        return res.status(400).json({ 
+          error: 'Invalid filter format', 
+          details: 'Filter must be a valid JSON array' 
+        });
+      }
+
+      const result = await bugRepo.searchAdvanced(parsedFilter, pageSize, lastEvaluatedKey);
+      return res.status(200).json(result);
+    }
 
     // If pagination is requested, use the search method which supports multiple filters
     if (page_size) {
@@ -192,8 +212,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       reportedBy: body.reportedBy,
       priority: body.priority,
       severity: body.severity,
+      type: body.type as any, // Type assertion needed because Zod enum vs BugType enum
       status: body.status || BugStatus.OPEN,
       assignedTo: body.assignedTo || null,
+      sprintId: body.sprintId || null,
       attachments: body.attachments ? body.attachments.join(',') : '',
       tags: body.tags || [],
       validated: false,

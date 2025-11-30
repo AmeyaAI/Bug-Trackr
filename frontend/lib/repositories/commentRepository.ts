@@ -190,7 +190,7 @@ export class CommentRepository {
         {
           field_name: 'payload.bug_id',
           field_value: bugId,
-          operator: 'contains',
+          operator: 'like',
         },
       ],
       {

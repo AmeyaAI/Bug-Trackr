@@ -59,6 +59,33 @@ export const updateProjectSchema = z.object({
   description: z.string().min(1).max(2000).optional(),
 });
 
+// Sprint schemas
+export const createSprintSchema = z.object({
+  projectId: z.string({
+    required_error: 'Project ID is required',
+    invalid_type_error: 'Project ID must be a string',
+  }).min(1, 'Project ID cannot be empty'),
+  name: z.string({
+    required_error: 'Sprint name is required',
+    invalid_type_error: 'Sprint name must be a string',
+  }).min(1, 'Sprint name cannot be empty'),
+  startDate: z.string().or(z.date()).transform(val => new Date(val)),
+  endDate: z.string().or(z.date()).transform(val => new Date(val)),
+  goal: z.string().optional(),
+  status: z.enum(['planned', 'active', 'completed']).optional(),
+}).refine(data => data.endDate > data.startDate, {
+  message: "End date must be after start date",
+  path: ["endDate"],
+});
+
+export const updateSprintSchema = z.object({
+  name: z.string().min(1).optional(),
+  startDate: z.string().or(z.date()).transform(val => new Date(val)).optional(),
+  endDate: z.string().or(z.date()).transform(val => new Date(val)).optional(),
+  goal: z.string().optional(),
+  status: z.enum(['planned', 'active', 'completed']).optional(),
+});
+
 // Bug schemas
 export const createBugSchema = z.object({
   title: z.string({
@@ -83,6 +110,7 @@ export const createBugSchema = z.object({
   severity: z.nativeEnum(BugSeverity, {
     errorMap: () => ({ message: 'Invalid bug severity. Must be Minor, Major, or Blocker' }),
   }),
+  type: z.enum(['bug', 'epic', 'task', 'suggestion']).optional().default('bug'),
   tags: z.array(z.nativeEnum(BugTag, {
     errorMap: () => ({ message: 'Invalid bug tag. Must be Epic, Task, Suggestion, Bug:Frontend, Bug:Backend, or Bug:Test' }),
   })).optional().default([]),
@@ -90,6 +118,7 @@ export const createBugSchema = z.object({
     errorMap: () => ({ message: 'Invalid bug status. Must be Open, In Progress, Resolved, or Closed' }),
   }).optional(),
   assignedTo: z.string().min(1, 'Assigned user ID cannot be empty').optional(),
+  sprintId: z.string().nullable().optional(),
   attachments: z.array(z.string()).optional().default([]),
 });
 
@@ -125,6 +154,7 @@ export const updateBugSchema = z.object({
   severity: z.nativeEnum(BugSeverity).optional(),
   projectId: z.string().min(1).optional(),
   assignedTo: z.string().min(1).nullable().optional(),
+  sprintId: z.string().nullable().optional(),
   attachments: z.string().optional(),
   tags: z.array(z.nativeEnum(BugTag)).optional(),
 });

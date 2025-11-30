@@ -7,7 +7,6 @@ dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 // Base URL usually ends with .../dpdo_bug_tracker
 // We need to handle if the env var already includes the collection name or not.
-// Based on .env.local it ends with dpdo_bug_tracker.
 let BASE_COLLECTION_URL = process.env.APPFLYTE_COLLECTION_BASE_URL || 'https://appflyte-backend.ameya.ai/0aee6bd7-ed42-4184-9bac-ce0466737ada/api/collection/0aee6bd7-ed42-4184-9bac-ce0466737ada/user/public/cm/0/dpdo_bug_tracker';
 
 // Remove trailing slash if present
@@ -15,13 +14,18 @@ if (BASE_COLLECTION_URL.endsWith('/')) {
     BASE_COLLECTION_URL = BASE_COLLECTION_URL.slice(0, -1);
 }
 
-// If the env var included bug_tracking_bugs, strip it to get the real base
-if (BASE_COLLECTION_URL.endsWith('/bug_tracking_bugs')) {
-    BASE_COLLECTION_URL = BASE_COLLECTION_URL.replace('/bug_tracking_bugs', '');
+// If the env var included bug_tracking_project, strip it to get the real base
+if (BASE_COLLECTION_URL.endsWith('/bug_tracking_project')) {
+    BASE_COLLECTION_URL = BASE_COLLECTION_URL.replace('/bug_tracking_project', '');
 }
 
-const FETCH_URL = `${BASE_COLLECTION_URL}/bug_tracking_bugss`;
-const DELETE_URL_PREFIX = `${BASE_COLLECTION_URL}/bug_tracking_bugs`;
+// Also handle if it ended with bug_tracking_projects (plural) just in case
+if (BASE_COLLECTION_URL.endsWith('/bug_tracking_projects')) {
+    BASE_COLLECTION_URL = BASE_COLLECTION_URL.replace('/bug_tracking_projects', '');
+}
+
+const FETCH_URL = `${BASE_COLLECTION_URL}/bug_tracking_projects`;
+const DELETE_URL_PREFIX = `${BASE_COLLECTION_URL}/bug_tracking_project`;
 
 const TOKEN = process.env.APPFLYTE_COLLECTION_API_KEY ? `Bearer ${process.env.APPFLYTE_COLLECTION_API_KEY}` : process.env.AUTH_TOKEN;
 
@@ -35,9 +39,9 @@ const headers = {
   'Content-Type': 'application/json'
 };
 
-async function deleteBugs() {
+async function deleteProjects() {
   try {
-    console.log(`Fetching bugs from: ${FETCH_URL}`);
+    console.log(`Fetching projects from: ${FETCH_URL}`);
     const response = await axios.get(FETCH_URL, { headers });
     
     // Check the UUID-like key
@@ -55,10 +59,10 @@ async function deleteBugs() {
         items = response.data.Collection;
     }
     
-    console.log(`Found ${items.length} bugs.`);
+    console.log(`Found ${items.length} projects.`);
 
     if (items.length === 0) {
-      console.log('No bugs to delete.');
+      console.log('No projects to delete.');
       return;
     }
 
@@ -72,7 +76,7 @@ async function deleteBugs() {
         continue;
       }
 
-      console.log(`Processing bug ${itemId}...`);
+      console.log(`Processing project ${itemId}...`);
 
       // Step 1: Update RelativeFields to remove relationships
       try {
@@ -81,24 +85,16 @@ async function deleteBugs() {
             "id": itemId,
             "fields": [
                 {
-                    "path": "$.project_id",
+                    "path": "$.bug_tracking_sprintss",
                     "value": []
                 },
                 {
-                    "path": "$.reported_by",
+                    "path": "$.bug_tracking_bugss",
                     "value": []
                 },
                 {
-                    "path": "$.assigned_to",
+                    "path": "$.created_by",
                     "value": []
-                },
-                {
-                    "path": "$.bug_tracking_activitiess",
-                    "value": []
-                },
-                {
-                  "path": "$.sprint_id",
-                  "value": []
                 }
             ]
         };
@@ -106,33 +102,33 @@ async function deleteBugs() {
         await axios.put(`${DELETE_URL_PREFIX}/${itemId}`, updatePayload, { headers });
         console.log(`  - Relative fields removed.`);
       } catch (error) {
-         console.error(`  - Failed to update bug ${itemId}:`, error.message);
+         console.error(`  - Failed to update project ${itemId}:`, error.message);
          if (error.response) {
              console.error('    Response:', error.response.status, error.response.data);
          }
          // We continue to try deleting even if update failed, though it might fail too.
       }
 
-      // Step 2: Delete the bug
+      // Step 2: Delete the project
       try {
-        console.log(`  - Deleting bug ${itemId}...`);
+        console.log(`  - Deleting project ${itemId}...`);
         await axios.delete(`${DELETE_URL_PREFIX}/${itemId}`, { headers });
-        console.log(`  - Successfully deleted bug ${itemId}`);
+        console.log(`  - Successfully deleted project ${itemId}`);
       } catch (error) {
-        console.error(`  - Failed to delete bug ${itemId}:`, error.message);
+        console.error(`  - Failed to delete project ${itemId}:`, error.message);
         if (error.response) {
             console.error('    Response:', error.response.status, error.response.data);
         }
       }
     }
 
-    console.log('Finished deleting bugs.');
+    console.log('Finished deleting projects.');
   } catch (error) {
-    console.error('Error fetching bugs:', error.message);
+    console.error('Error fetching projects:', error.message);
     if (error.response) {
       console.error('Response data:', error.response.data);
     }
   }
 }
 
-deleteBugs();
+deleteProjects();

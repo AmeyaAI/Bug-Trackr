@@ -297,7 +297,7 @@ const ActivityLogsPage: React.FC = () => {
                   <div className="absolute left-4 top-8 bottom-8 w-0.5 bg-gray-200 dark:bg-gray-800" />
 
                   {logs.map((log) => (
-                    <div key={log._id} className="relative">
+                    <div key={log.id} className="relative">
                       {/* Timeline Node Icon */}
                       <div className="absolute left-0 top-3 w-8 h-8 bg-white dark:bg-[#111827] border-2 border-gray-200 dark:border-gray-800 rounded-lg flex items-center justify-center text-blue-500 z-10">
                         {getActionIcon(log.action)}

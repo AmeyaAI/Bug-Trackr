@@ -43,6 +43,10 @@ export function keysToCamelCase<T = any>(obj: Record<string, any>): T {
     return obj;
   }
   
+  if (obj instanceof Date) {
+    return obj as any;
+  }
+
   if (Array.isArray(obj)) {
     return obj.map(item => keysToCamelCase(item)) as any;
   }
@@ -56,7 +60,9 @@ export function keysToCamelCase<T = any>(obj: Record<string, any>): T {
   for (const [key, value] of Object.entries(obj)) {
     const camelKey = toCamelCase(key);
     
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    if (value instanceof Date) {
+      result[camelKey] = value;
+    } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
       result[camelKey] = keysToCamelCase(value);
     } else if (Array.isArray(value)) {
       result[camelKey] = value.map(item => 
@@ -84,6 +90,10 @@ export function keysToSnakeCase<T = any>(obj: Record<string, any>): T {
     return obj;
   }
   
+  if (obj instanceof Date) {
+    return obj as any;
+  }
+
   if (Array.isArray(obj)) {
     return obj.map(item => keysToSnakeCase(item)) as any;
   }
@@ -97,7 +107,9 @@ export function keysToSnakeCase<T = any>(obj: Record<string, any>): T {
   for (const [key, value] of Object.entries(obj)) {
     const snakeKey = toSnakeCase(key);
     
-    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    if (value instanceof Date) {
+      result[snakeKey] = value;
+    } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
       result[snakeKey] = keysToSnakeCase(value);
     } else if (Array.isArray(value)) {
       result[snakeKey] = value.map(item => 

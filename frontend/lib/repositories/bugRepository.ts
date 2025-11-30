@@ -14,7 +14,7 @@
  */
 
 import { CollectionDBService, FilterQuery } from '../services/collectionDb';
-import { Bug, CreateBugInput, UpdateBugInput, BugStatus, BugTag, BugPriority, BugSeverity } from '../models/bug';
+import { Bug, CreateBugInput, UpdateBugInput, BugStatus, BugTag, BugPriority, BugSeverity, BugType } from '../models/bug';
 import { Project } from '../models/project';
 import { User } from '../models/user';
 import { logger } from '../utils/logger';
@@ -44,7 +44,7 @@ function tagsFromString(tagsStr: string): BugTag[] {
  * Also ensures relational fields are stored as arrays
  */
 function transformBugForStorage(bug: Partial<Bug>): Record<string, unknown> {
-  const { tags, projectId, reportedBy, assignedTo, ...rest } = bug;
+  const { tags, projectId, reportedBy, assignedTo, sprintId, ...rest } = bug;
   
   const storageData: Record<string, unknown> = {
     ...rest,
@@ -61,6 +61,10 @@ function transformBugForStorage(bug: Partial<Bug>): Record<string, unknown> {
 
   if (assignedTo !== undefined) {
     storageData.assignedTo = assignedTo ? [assignedTo] : [];
+  }
+
+  if (sprintId !== undefined) {
+    storageData.sprintId = sprintId ? [sprintId] : [];
   }
 
   return storageData;
@@ -118,6 +122,11 @@ function transformBugFromStorage(bug: Record<string, unknown>): Bug {
   const reportedBy = extractSingle(reportedByRaw) as string;
   const assignedTo = (extractSingle(assignedToRaw) as string) || null;
   
+  const sprintIdRaw = bug.sprintId || bug.sprint_id;
+  const sprintId = (extractSingle(sprintIdRaw) as string) || null;
+
+  const type = (bug.type || 'bug') as BugType;
+
   const attachments = (bug.attachments || '') as string;
   const tagsRaw = bug.tags;
   const tags = typeof tagsRaw === 'string' ? tagsFromString(tagsRaw) : [];
@@ -140,6 +149,8 @@ function transformBugFromStorage(bug: Record<string, unknown>): Bug {
     projectId,
     reportedBy,
     assignedTo,
+    sprintId,
+    type,
     attachments,
     tags,
     validated,
@@ -280,7 +291,7 @@ export class BugRepository {
       dbFilters.push({
         field_name: 'payload.project_id',
         field_value: filters.projectId,
-        operator: 'contains',
+        operator: 'like',
       });
     }
 
@@ -303,7 +314,7 @@ export class BugRepository {
             dbFilters.push({
                 field_name: 'payload.assigned_to',
                 field_value: filters.assignedTo,
-                operator: 'contains',
+                operator: 'like',
             });
         }
     }
@@ -320,7 +331,7 @@ export class BugRepository {
       dbFilters.push({
         field_name: 'payload.title',
         field_value: filters.searchQuery,
-        operator: 'contains',
+        operator: 'like',
       });
     }
 
@@ -345,6 +356,40 @@ export class BugRepository {
   }
 
   /**
+   * Advanced search with raw filter queries
+   * @param filters - Array of filter queries
+   * @param pageSize - Number of items per page
+   * @param lastEvaluatedKey - Cursor for next page
+   * @returns Object with bugs and next cursor
+   */
+  async searchAdvanced(
+    filters: FilterQuery[],
+    pageSize: number,
+    lastEvaluatedKey?: string
+  ): Promise<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }> {
+    logger.debug('Searching bugs (advanced)', { filters, pageSize, lastEvaluatedKey });
+
+    const result = await this.collectionDb.queryItemsPaginated<Record<string, unknown>>(
+      COLLECTION_PLURAL,
+      filters,
+      {
+        includeDetail: false,
+        pageSize,
+        lastEvaluatedKey,
+      }
+    );
+
+    // Transform tags string to array for each bug
+    const transformedBugs = result.items.map(transformBugFromStorage);
+
+    logger.info('Bugs searched successfully (advanced)', { count: transformedBugs.length });
+    return {
+      bugs: transformedBugs,
+      lastEvaluatedKey: result.lastEvaluatedKey
+    };
+  }
+
+  /**
    * Retrieves bugs by project ID
    * Uses filter query for optimized retrieval
    * @param projectId - Project ID
@@ -360,7 +405,7 @@ export class BugRepository {
         {
           field_name: 'payload.project_id',
           field_value: projectId,
-          operator: 'contains',
+          operator: 'like',
         },
       ],
       {
@@ -392,7 +437,7 @@ export class BugRepository {
         {
           field_name: 'payload.assigned_to',
           field_value: assigneeId,
-          operator: 'contains',
+          operator: 'like',
         },
       ],
       {

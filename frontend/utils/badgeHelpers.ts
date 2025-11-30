@@ -6,6 +6,7 @@
  */
 
 import { BugStatus, BugPriority, BugSeverity } from './types';
+import { BugType } from '@/lib/models/bug';
 import { BADGE_VARIANTS } from './constants';
 
 /**
@@ -21,6 +22,22 @@ export function getStatusBadgeVariant(
 }
 
 /**
+ * Get border class based on bug type
+ * 
+ * @param type - Bug type enum value
+ * @returns Tailwind border class string
+ */
+export function getBugTypeBorderClass(type: BugType): string {
+  switch (type) {
+    case 'epic': return 'border-l-4 border-l-purple-500';
+    case 'task': return 'border-l-4 border-l-green-500';
+    case 'bug': return 'border-l-4 border-l-red-500';
+    case 'suggestion': return 'border-l-4 border-l-blue-500';
+    default: return 'border-l-4 border-l-gray-300';
+  }
+}
+
+/**
  * Get badge variant based on bug priority
  * 
  * @param priority - Bug priority enum value
@@ -28,7 +45,7 @@ export function getStatusBadgeVariant(
  */
 export function getPriorityBadgeVariant(
   priority: BugPriority
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+): any {
   return BADGE_VARIANTS.PRIORITY[priority] || 'outline';
 }
 

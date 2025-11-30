@@ -3,7 +3,9 @@
  * These types ensure type safety for API communication
  */
 
-import { BugTag } from '@/lib/models/bug';
+import { BugTag, BugType } from '@/lib/models/bug';
+export { BugTag };
+export type { BugType };
 
 // Enums matching backend
 export enum BugStatus {
@@ -25,6 +27,15 @@ export enum BugSeverity {
   MINOR = "Minor",
   MAJOR = "Major",
   BLOCKER = "Blocker",
+  // Suggestion severities
+  NICE_TO_HAVE = "Nice to have",
+  MUST_HAVE = "Must have",
+  STRATEGIC = "Strategic",
+  // Epic/Task severities
+  TRIVIAL = "Trivial",
+  MODERATE = "Moderate",
+  HEAVY = "Heavy",
+  MASSIVE = "Massive",
 }
 
 export enum UserRole {
@@ -41,9 +52,11 @@ export interface Bug {
   projectId: string;
   reportedBy: string;
   assignedTo?: string | null;
+  sprintId?: string | null;
   status: BugStatus;
   priority: BugPriority;
   severity: BugSeverity;
+  type: BugType;
   tags: BugTag[];
   validated: boolean;
   createdAt: string;
@@ -97,7 +110,9 @@ export interface BugCreateRequest {
   reportedBy: string;
   priority: BugPriority;
   severity: BugSeverity;
+  type: BugType;
   tags: BugTag[];
+  sprintId?: string | null;
 }
 
 export interface BugStatusUpdateRequest {
@@ -131,9 +146,11 @@ export interface BugResponse {
   projectId: string;
   reportedBy: string;
   assignedTo?: string;
+  sprintId?: string | null;
   status: BugStatus;
   priority: BugPriority;
   severity: BugSeverity;
+  type: BugType;
   tags: BugTag[];
   validated: boolean;
   createdAt: string;

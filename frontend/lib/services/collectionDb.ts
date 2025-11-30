@@ -45,9 +45,9 @@ export interface FilterQuery {
   /** Field name to filter on (e.g., "payload.project_id") */
   field_name: string;
   /** Value to compare against */
-  field_value: string | number | boolean | null;
+  field_value: string | number | boolean | null | unknown[];
   /** Comparison operator */
-  operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains';
+  operator: 'eq' | 'like';
 }
 
 /**
@@ -143,7 +143,7 @@ export class CollectionDBService {
     if (options.filter && options.filter.length > 0) {
       // Encode filter as JSON string
       const filterJson = JSON.stringify(options.filter);
-      params.append('filter', filterJson);
+      params.append('filters', filterJson);
     }
 
     return params;

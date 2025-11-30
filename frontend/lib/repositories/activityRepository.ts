@@ -13,7 +13,7 @@
  */
 
 import { CollectionDBService } from '../services/collectionDb';
-import { Activity, CreateActivityInput } from '../models/activity';
+import { Activity, CreateActivityInput, ActivityAction } from '../models/activity';
 import { logger } from '../utils/logger';
 
 const COLLECTION_PLURAL = 'bug_tracking_activitiess';
@@ -191,7 +191,7 @@ export class ActivityRepository {
         {
           field_name: 'payload.bug_id',
           field_value: bugId,
-          operator: 'contains',
+          operator: 'like',
         },
       ],
       {

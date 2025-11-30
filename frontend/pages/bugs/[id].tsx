@@ -31,8 +31,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CommentSection } from '@/components/CommentSection';
-import { bugApi, projectApi, userApi, commentApi, handleApiError, ApiErrorResponse } from '@/utils/apiClient';
+import { bugApi, projectApi, userApi, commentApi, sprintApi, handleApiError, ApiErrorResponse } from '@/utils/apiClient';
 import { Bug, Comment, BugStatus, Project, User, UserRole, getRolePermissions } from '@/utils/types';
+import { Sprint } from '@/lib/models/sprint';
 import { getUserName as getNameFromUsers, getStatusBadgeVariant, getPriorityBadgeVariant, getSeverityBadgeVariant } from '@/utils/badgeHelpers';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -52,6 +53,7 @@ export default function BugDetailsPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [reportedByUser, setReportedByUser] = useState<User | null>(null);
   const [assignedUser, setAssignedUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,8 +62,10 @@ export default function BugDetailsPage() {
   // Dialog states
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [showSprintDialog, setShowSprintDialog] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<BugStatus | null>(null);
+  const [selectedSprint, setSelectedSprint] = useState<string>('backlog');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadBugDetails = useCallback(async (bugId: string) => {
@@ -81,10 +85,14 @@ export default function BugDetailsPage() {
       // Load project details
       if (bugData.bug.projectId) {
         try {
-          const projectData = await projectApi.getById(bugData.bug.projectId);
+          const [projectData, sprintsData] = await Promise.all([
+            projectApi.getById(bugData.bug.projectId),
+            sprintApi.getByProject(bugData.bug.projectId)
+          ]);
           setProject(projectData);
+          setSprints(sprintsData);
         } catch (err) {
-          console.warn('Failed to load project details:', err);
+          console.warn('Failed to load project details or sprints:', err);
           // Don't fail the whole page load if project fails
         }
       }
@@ -228,6 +236,27 @@ export default function BugDetailsPage() {
       setSelectedStatus(null);
     } catch (err) {
       console.error('Failed to update status:', err);
+      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleMoveToSprint = async () => {
+    if (!currentUser || !bug) return;
+    
+    setIsSubmitting(true);
+    try {
+      const sprintIdToUpdate = selectedSprint === 'backlog' ? null : selectedSprint;
+      await handleEventualConsistency(
+        () => bugApi.updateSprint(bug.id, sprintIdToUpdate, currentUser.role),
+        () => loadBugDetails(bug.id)
+      );
+      toast.success('Bug moved to sprint successfully');
+      setShowSprintDialog(false);
+    } catch (err) {
+      console.error('Failed to move bug to sprint:', err);
       const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
       toast.error(errorMessage);
     } finally {
@@ -407,6 +436,20 @@ export default function BugDetailsPage() {
                   </Button>
                 )}
 
+                {/* Admin-specific: Move to Sprint */}
+                {currentUser.role === UserRole.ADMIN && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSelectedSprint(bug.sprintId || 'backlog');
+                      setShowSprintDialog(true);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Move to Sprint
+                  </Button>
+                )}
+
                 {/* Show message if no actions available */}
                 {!permissions.canValidateBug && 
                  !permissions.canCloseBug && 
@@ -506,6 +549,44 @@ export default function BugDetailsPage() {
               </Button>
               <Button onClick={handleStatusUpdate} disabled={!selectedStatus || isSubmitting}>
                 {isSubmitting ? 'Updating...' : 'Update'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sprint Dialog */}
+        <Dialog open={showSprintDialog} onOpenChange={setShowSprintDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Move to Sprint</DialogTitle>
+              <DialogDescription>
+                Select a sprint to move this bug to
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Select 
+              value={selectedSprint} 
+              onValueChange={setSelectedSprint}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select sprint" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="backlog">Backlog (No Sprint)</SelectItem>
+                {sprints.map(sprint => (
+                  <SelectItem key={sprint.id} value={sprint.id}>
+                    {sprint.name} ({sprint.status})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowSprintDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleMoveToSprint} disabled={isSubmitting}>
+                {isSubmitting ? 'Moving...' : 'Move'}
               </Button>
             </DialogFooter>
           </DialogContent>
