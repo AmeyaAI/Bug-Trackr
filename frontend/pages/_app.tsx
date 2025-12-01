@@ -7,18 +7,29 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthGuard } from "@/components/AuthGuard";
+import { useRouter } from "next/router";
 
 export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+  const isLoginPage = router.pathname === '/login';
+
   return (
     <ErrorBoundary showDetails={process.env.NODE_ENV === 'development'}>
       <ThemeProvider>
         <ToastProvider>
           <UserProvider>
             <NavbarProvider>
-              <AppSidebar>
-                <Component {...pageProps} />
-              </AppSidebar>
-              <ToastContainer />
+              <AuthGuard>
+                {isLoginPage ? (
+                  <Component {...pageProps} />
+                ) : (
+                  <AppSidebar>
+                    <Component {...pageProps} />
+                  </AppSidebar>
+                )}
+                <ToastContainer />
+              </AuthGuard>
             </NavbarProvider>
           </UserProvider>
         </ToastProvider>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Logging utility for consistent application logging
  * Respects DEBUG environment variable

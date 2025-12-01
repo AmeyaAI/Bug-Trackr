@@ -12,11 +12,9 @@ import {
   IconBug,
   IconFolder,
   IconHome,
-  IconHistory,
 } from "@tabler/icons-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/contexts/UserContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarUserSelector } from "@/components/SidebarUserSelector";
 import { useUsers } from "@/lib/hooks/useData";
@@ -27,7 +25,6 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ children }: AppSidebarProps) {
-  const { currentUser } = useUser();
   const [open, setOpen] = useState(false);
   const { users, isLoading: isLoadingUsers } = useUsers();
 

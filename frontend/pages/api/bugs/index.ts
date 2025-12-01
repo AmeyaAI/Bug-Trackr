@@ -212,6 +212,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       reportedBy: body.reportedBy,
       priority: body.priority,
       severity: body.severity,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       type: body.type as any, // Type assertion needed because Zod enum vs BugType enum
       status: body.status || BugStatus.OPEN,
       assignedTo: body.assignedTo || null,

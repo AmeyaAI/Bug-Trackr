@@ -63,6 +63,7 @@ export function TableProvider<TData, TValue>({
   className,
 }: TableProviderProps<TData, TValue>) {
   const [sorting, setSorting] = useAtom(sortingAtom);
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,

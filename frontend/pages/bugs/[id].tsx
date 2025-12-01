@@ -44,7 +44,7 @@ import { AxiosError } from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BugActivityLog } from '@/components/BugActivityLog';
-import { History, ArrowLeft, Layers, Calendar, Clock, User as UserIcon } from 'lucide-react';
+import { History, ArrowLeft, Layers, Calendar, Clock } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getInitials } from '@/lib/utils';
 

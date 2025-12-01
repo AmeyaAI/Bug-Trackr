@@ -28,21 +28,22 @@ export function getStatusBadgeVariant(
  * @returns Tailwind border class string
  */
 export function getBugTypeBorderClass(type: BugType | string): string {
-  const normalizedType = (type || '').toLowerCase();
+  const normalizedType = (type || '').toLowerCase().trim();
   
-  switch (normalizedType) {
-    case 'epic':
-      return 'border-l-4 border-l-purple-500';
-    case 'task':
-      return 'border-l-4 border-l-green-500';
-    case 'suggestion':
-      return 'border-l-4 border-l-blue-500';
-    default:
-      if (normalizedType.includes('bug')) {
-        return 'border-l-4 border-l-red-500';
-      }
-      return 'border-l-4 border-l-gray-300';
+  if (normalizedType.includes('epic')) {
+    return 'border-l-4 border-l-purple-500';
   }
+  if (normalizedType.includes('task')) {
+    return 'border-l-4 border-l-blue-500';
+  }
+  if (normalizedType.includes('suggestion')) {
+    return 'border-l-4 border-l-green-500';
+  }
+  if (normalizedType.includes('bug')) {
+    return 'border-l-4 border-l-red-500';
+  }
+  
+  return 'border-l-4 border-l-gray-300';
 }
 
 /**
@@ -53,7 +54,7 @@ export function getBugTypeBorderClass(type: BugType | string): string {
  */
 export function getPriorityBadgeVariant(
   priority: BugPriority
-): any {
+): 'default' | 'secondary' | 'destructive' | 'outline' {
   return BADGE_VARIANTS.PRIORITY[priority] || 'outline';
 }
 

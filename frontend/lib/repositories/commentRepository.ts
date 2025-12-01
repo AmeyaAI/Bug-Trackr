@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Comment Repository - Data access layer for Comment entities
  * 
@@ -15,7 +16,7 @@
 import { CollectionDBService } from '../services/collectionDb';
 import { CacheService } from '../services/cacheService';
 import { Comment, CreateCommentInput } from '../models/comment';
-import { Bug, BugTag } from '../models/bug';
+import { Bug } from '../models/bug';
 import { User } from '../models/user';
 import { logger } from '../utils/logger';
 import { tagsFromString } from '../utils/transformers';
@@ -61,7 +62,7 @@ function transformCommentFromStorage(comment: Record<string, unknown>): Comment 
         if (Array.isArray(parsed)) {
           return parsed.length > 0 ? parsed[0] : undefined;
         }
-      } catch (e) {
+      } catch {
         // Ignore
       }
     }

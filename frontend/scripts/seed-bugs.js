@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 const axios = require('axios');
 const path = require('path');
 const dotenv = require('dotenv');

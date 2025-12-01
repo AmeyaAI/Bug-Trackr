@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { LRUCache } from 'lru-cache';
 import { logger } from '../utils/logger';
 

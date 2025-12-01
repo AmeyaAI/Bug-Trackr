@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Data transformation utilities for converting between Collection DB format
  * and TypeScript application format

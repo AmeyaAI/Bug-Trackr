@@ -22,7 +22,7 @@ import { logger } from '../utils/logger';
 
 const COLLECTION_PLURAL = 'bug_tracking_bugss';
 const COLLECTION_SINGULAR = 'bug_tracking_bugs';
-const CACHE_TTL = 60 * 1000; // 1 minute cache for bugs
+// const CACHE_TTL = 60 * 1000; // 1 minute cache for bugs
 
 /**
  * Converts tags array to comma-separated string for Collection DB storage

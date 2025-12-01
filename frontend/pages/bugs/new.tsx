@@ -67,7 +67,6 @@ export default function NewBugPage() {
   const [isLoadingSprints, setIsLoadingSprints] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBugTypeDialog, setShowBugTypeDialog] = useState(true);
-  const [preSelectedTag, setPreSelectedTag] = useState<BugTag | null>(null);
 
   const {
     register,
@@ -193,7 +192,6 @@ export default function NewBugPage() {
   };
 
   const handleBugTypeSelection = (type: BugTag) => {
-    setPreSelectedTag(type);
     setValue("type", type, { shouldValidate: true });
     setShowBugTypeDialog(false);
   };

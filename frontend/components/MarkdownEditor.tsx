@@ -72,7 +72,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabMode>('write');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   
   // Local state for immediate feedback and to decouple from parent render cycle
   const [localValue, setLocalValue] = useState(value);

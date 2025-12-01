@@ -15,7 +15,7 @@ import { PriorityIcon } from '@/components/PriorityIcon';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { bugApi, projectApi } from '@/utils/apiClient';
-import { Bug, BugStatus, BugPriority, Project, User, UserRole } from '@/utils/types';
+import { Bug, BugStatus, BugPriority, Project, UserRole } from '@/utils/types';
 import { BugType } from '@/lib/models/bug';
 import { useUser } from '@/contexts/UserContext';
 import { useUsers } from '@/lib/hooks/useData';

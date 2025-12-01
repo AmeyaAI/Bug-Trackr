@@ -19,7 +19,7 @@ import { CacheService } from '../services/cacheService';
 
 const COLLECTION_PLURAL = 'bug_tracking_activitiess';
 const COLLECTION_SINGULAR = 'bug_tracking_activities';
-const CACHE_TTL = 60 * 1000; // 1 minute cache for activities
+// const CACHE_TTL = 60 * 1000; // 1 minute cache for activities
 
 /**
  * Transforms activity data for Collection DB storage
@@ -59,7 +59,7 @@ function transformActivityFromStorage(activity: Record<string, unknown>): Activi
         if (Array.isArray(parsed)) {
           return parsed.length > 0 ? parsed[0] : undefined;
         }
-      } catch (e) {
+      } catch {
         // Ignore
       }
     }

@@ -55,7 +55,7 @@ function transformProjectFromStorage(project: Record<string, unknown>): Project 
         if (Array.isArray(parsed)) {
           return parsed.length > 0 ? parsed[0] : undefined;
         }
-      } catch (e) {
+      } catch {
         // Ignore
       }
     }

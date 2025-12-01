@@ -12,50 +12,27 @@ import { useUser } from '@/contexts/UserContext';
 import { User } from '@/utils/types';
 import { getInitials } from '@/lib/utils';
 import { getRoleBadgeVariant, formatRole } from '@/utils/badgeHelpers';
-import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { IconChevronDown, IconChevronUp, IconLogout } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/router';
 
 interface SidebarUserSelectorProps {
-  users: User[];
+  users?: User[];
   onUserChange?: (user: User | null) => void;
   isOpen?: boolean;
 }
 
 export const SidebarUserSelector: React.FC<SidebarUserSelectorProps> = ({
-  users,
-  onUserChange,
   isOpen = true,
 }) => {
   const { currentUser, setCurrentUser } = useUser();
   const [isExpanded, setIsExpanded] = useState(false);
+  const router = useRouter();
 
-  // Auto-select first user if no user is selected
-  React.useEffect(() => {
-    if (!currentUser && users.length > 0) {
-      setCurrentUser(users[0]);
-      if (onUserChange) {
-        onUserChange(users[0]);
-      }
-    } else if (currentUser && users.length > 0) {
-      // Check if current user still exists in the users list
-      const userExists = users.some(u => u.id === currentUser.id);
-      if (!userExists) {
-        // User was deleted, select first available user
-        setCurrentUser(users[0]);
-        if (onUserChange) {
-          onUserChange(users[0]);
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [users, currentUser, setCurrentUser, onUserChange]);
-
-  const handleUserSelect = (user: User) => {
-    setCurrentUser(user);
-    setIsExpanded(false);
-    if (onUserChange) {
-      onUserChange(user);
-    }
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('bugtrackr_token');
+    router.push('/login');
   };
 
   if (!currentUser) return null;
@@ -108,38 +85,14 @@ export const SidebarUserSelector: React.FC<SidebarUserSelectorProps> = ({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mt-1 max-h-60 overflow-y-auto bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-md shadow-lg">
-              {users.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => handleUserSelect(user)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors ${
-                    user.id === currentUser.id
-                      ? 'bg-neutral-100 dark:bg-neutral-800'
-                      : ''
-                  }`}
-                >
-                  <Avatar className="size-6 shrink-0">
-                    <AvatarFallback className="text-xs">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col flex-1 min-w-0 text-left">
-                    <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-                      {user.name}
-                    </span>
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                      {user.email}
-                    </span>
-                  </div>
-                  <Badge
-                    variant={getRoleBadgeVariant(user.role)}
-                    className="text-xs shrink-0"
-                  >
-                    {formatRole(user.role)}
-                  </Badge>
-                </button>
-              ))}
+            <div className="mt-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-md shadow-lg">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
+              >
+                <IconLogout className="size-4" />
+                <span className="text-sm font-medium">Sign out</span>
+              </button>
             </div>
           </motion.div>
         )}
