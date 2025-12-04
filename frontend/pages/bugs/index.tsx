@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ColumnDef } from '@tanstack/react-table';
+import { ValidationDialog } from '@/components/ValidationDialog';
 
 export default function BugsPage() {
   const router = useRouter();
@@ -68,6 +69,8 @@ export default function BugsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [dragStartStatus, setDragStartStatus] = useState<BugStatus | null>(null);
+  const [validationDialogOpen, setValidationDialogOpen] = useState(false);
+  const [pendingBugId, setPendingBugId] = useState<string | null>(null);
 
   // Data hooks
   const { users } = useUsers();
@@ -526,6 +529,22 @@ export default function BugsPage() {
 
     // Compare with oldStatus from the start of the drag
     if (newStatus && oldStatus && newStatus !== oldStatus) {
+      // Check for validation requirement
+      if (newStatus === BugStatus.CLOSED && !bug.validated) {
+        setPendingBugId(bug.id);
+        setValidationDialogOpen(true);
+        // Revert changes immediately to prevent the card from staying in the new column
+        loadData(); 
+        return;
+      }
+
+      // Optimistic update: Invalidate if moving from CLOSED
+      if (oldStatus === BugStatus.CLOSED && newStatus !== BugStatus.CLOSED) {
+        setBugs(prevBugs => prevBugs.map(b => 
+          b.id === bug.id ? { ...b, validated: false } : b
+        ));
+      }
+
       try {
         // Optimistic update is handled by onDataChange, but we need to ensure consistency
         // Actually, onDataChange updates the list order and column in local state.
@@ -543,6 +562,47 @@ export default function BugsPage() {
         loadData();
       }
     }
+  };
+
+  const handleValidationConfirm = async () => {
+    if (pendingBugId && currentUser) {
+      const bugToUpdate = bugs.find(b => b.id === pendingBugId);
+      if (!bugToUpdate) return;
+
+      // Optimistic update
+      setBugs(prevBugs => prevBugs.map(b => 
+        b.id === pendingBugId 
+          ? { ...b, status: BugStatus.CLOSED, validated: true } 
+          : b
+      ));
+      
+      setValidationDialogOpen(false);
+      const bugId = pendingBugId;
+      setPendingBugId(null);
+
+      try {
+        // Validate first
+        await bugApi.validate(bugId, currentUser.id, currentUser.role);
+        // Then update status to CLOSED
+        await bugApi.updateStatus(bugId, {
+          status: BugStatus.CLOSED,
+          userId: currentUser.id,
+          userRole: currentUser.role as UserRole
+        });
+      } catch (error) {
+        console.error('Failed to validate and close bug:', error);
+        // Revert changes on error
+        setBugs(prevBugs => prevBugs.map(b => 
+            b.id === bugId ? bugToUpdate : b
+        ));
+        loadData();
+      }
+    }
+  };
+
+  const handleValidationCancel = () => {
+    setValidationDialogOpen(false);
+    setPendingBugId(null);
   };
 
   if (loadError) {
@@ -876,6 +936,13 @@ export default function BugsPage() {
           </Button>
         </div>
       </div>
+      
+      <ValidationDialog 
+        open={validationDialogOpen} 
+        onOpenChange={setValidationDialogOpen}
+        onValidate={handleValidationConfirm}
+        onCancel={handleValidationCancel}
+      />
     </div>
   );
 }

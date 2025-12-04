@@ -72,9 +72,9 @@ export class CollectionDBService {
    * Creates a new Collection DB Service instance
    * @param baseUrl - Base URL for Collection DB (e.g., https://.../.../dpdo_bug_tracker)
    * @param apiKey - API key for authentication
-   * @param timeout - Request timeout in milliseconds (default: 30000)
+   * @param timeout - Request timeout in milliseconds (default: 60000)
    */
-  constructor(baseUrl: string, apiKey: string, timeout: number = 30000) {
+  constructor(baseUrl: string, apiKey: string, timeout: number = 60000) {
     if (!baseUrl || baseUrl.trim() === '') {
       throw new Error('Collection DB base URL is required');
     }
@@ -494,7 +494,8 @@ export class CollectionDBService {
    * @param collectionSingular - Singular collection name
    * @param id - Item ID
    * @param updates - Partial updates (will be converted to snake_case)
-   * @returns Updated item
+   * @param fetchAfterUpdate - Whether to fetch the updated item after update (default: true)
+   * @returns Updated item (or partial item if fetchAfterUpdate is false)
    * @throws {Error} On validation errors, not found, or server errors
    * @example
    * const updatedUser = await service.updateItem('user', '123', {
@@ -504,7 +505,8 @@ export class CollectionDBService {
   async updateItem<T>(
     collectionSingular: string,
     id: string,
-    updates: Partial<T>
+    updates: Partial<T>,
+    fetchAfterUpdate: boolean = true
   ): Promise<T> {
     const url = this.buildItemUrl(collectionSingular, id);
     
@@ -548,6 +550,17 @@ export class CollectionDBService {
         throw new Error(`Validation error: ${errorText}`);
       }
       throw new Error(`Failed to update item: ${response.status} ${errorText}`);
+    }
+
+    if (!fetchAfterUpdate) {
+      logger.info('Item updated successfully, skipping fetch', {
+        collection: collectionSingular,
+        id,
+      });
+      // Return the updates merged with ID as a best-effort result
+      // Note: This is not the full item, but satisfies the Promise<T> signature for now
+      // The caller should handle merging if needed
+      return { ...updates, id } as unknown as T;
     }
 
     // Update successful - now fetch the updated item

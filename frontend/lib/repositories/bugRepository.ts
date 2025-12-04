@@ -512,96 +512,179 @@ export class BugRepository {
    * Updates bug status
    * @param bugId - Bug ID
    * @param status - New status
+   * @param currentBug - Optional current bug object to avoid re-fetching
    * @returns Updated bug
    * @throws {Error} On validation errors, not found, or server errors
    */
-  async updateStatus(bugId: string, status: BugStatus): Promise<Bug> {
+  async updateStatus(bugId: string, status: BugStatus, currentBug?: Bug | null): Promise<Bug> {
     logger.debug('Updating bug status', { bugId, status });
 
-    const updatedBug = await this.collectionDb.updateItem<Record<string, unknown>>(
+    const now = new Date();
+    const updatedBugPartial = await this.collectionDb.updateItem<Record<string, unknown>>(
       COLLECTION_SINGULAR,
       bugId,
       {
         status,
-        updatedAt: new Date(),
-      }
+        updatedAt: now,
+      },
+      false // Skip fetch
     );
 
-    // Transform tags string to array
-    const transformedBug = transformBugFromStorage(updatedBug);
-
-    // Update cache
-    if (this.cacheService) {
-      this.cacheService.set(`bug:${bugId}`, transformedBug);
+    // If we have the current bug, merge the updates
+    if (currentBug) {
+      const updatedBug = {
+        ...currentBug,
+        status,
+        updatedAt: now,
+      };
+      
+      // Update cache
+      if (this.cacheService) {
+        this.cacheService.set(`bug:${bugId}`, updatedBug);
+      }
+      
+      return updatedBug;
     }
 
-    logger.info('Bug status updated successfully', { bugId, status });
-    return transformedBug;
+    // If we don't have current bug, we might need to fetch it or return partial
+    // But since we are skipping fetch in updateItem, we only have partial data.
+    // Let's try to get from cache if not provided
+    if (this.cacheService) {
+      const cachedBug = this.cacheService.get<Bug>(`bug:${bugId}`);
+      if (cachedBug) {
+        const updatedBug = {
+          ...cachedBug,
+          status,
+          updatedAt: now,
+        };
+        this.cacheService.set(`bug:${bugId}`, updatedBug);
+        return updatedBug;
+      }
+    }
+
+    logger.warn('Current bug not provided and cache miss in updateStatus, fetching from DB', { bugId });
+    const fetchedBug = await this.getById(bugId);
+    if (!fetchedBug) {
+        throw new Error(`Bug not found after update: ${bugId}`);
+    }
+    return fetchedBug;
   }
 
   /**
    * Updates bug assignment
    * @param bugId - Bug ID
    * @param assignedTo - User ID to assign to (or null to unassign)
+   * @param currentBug - Optional current bug object to avoid re-fetching
    * @returns Updated bug
    * @throws {Error} On validation errors, not found, or server errors
    */
-  async updateAssignment(bugId: string, assignedTo: string | null): Promise<Bug> {
+  async updateAssignment(bugId: string, assignedTo: string | null, currentBug?: Bug | null): Promise<Bug> {
     logger.debug('Updating bug assignment', { bugId, assignedTo });
 
-    const updatedBug = await this.collectionDb.updateItem<Record<string, unknown>>(
+    const now = new Date();
+    const updatedBugPartial = await this.collectionDb.updateItem<Record<string, unknown>>(
       COLLECTION_SINGULAR,
       bugId,
       {
         assignedTo,
-        updatedAt: new Date(),
-      }
+        updatedAt: now,
+      },
+      false // Skip fetch
     );
 
-    // Transform tags string to array
-    const transformedBug = transformBugFromStorage(updatedBug);
-
-    // Update cache
-    if (this.cacheService) {
-      this.cacheService.set(`bug:${bugId}`, transformedBug);
+    if (currentBug) {
+      const updatedBug = {
+        ...currentBug,
+        assignedTo,
+        updatedAt: now,
+      };
+      
+      if (this.cacheService) {
+        this.cacheService.set(`bug:${bugId}`, updatedBug);
+      }
+      
+      return updatedBug;
     }
 
-    logger.info('Bug assignment updated successfully', { bugId, assignedTo });
-    return transformedBug;
+    if (this.cacheService) {
+      const cachedBug = this.cacheService.get<Bug>(`bug:${bugId}`);
+      if (cachedBug) {
+        const updatedBug = {
+          ...cachedBug,
+          assignedTo,
+          updatedAt: now,
+        };
+        this.cacheService.set(`bug:${bugId}`, updatedBug);
+        return updatedBug;
+      }
+    }
+
+    logger.warn('Current bug not provided and cache miss in updateAssignment, fetching from DB', { bugId });
+    const fetchedBug = await this.getById(bugId);
+    if (!fetchedBug) {
+        throw new Error(`Bug not found after assignment update: ${bugId}`);
+    }
+    return fetchedBug;
   }
 
   /**
    * Updates an existing bug
    * @param bugId - Bug ID
    * @param updates - Partial bug updates
+   * @param currentBug - Optional current bug object to avoid re-fetching
    * @returns Updated bug
    * @throws {Error} On validation errors, not found, or server errors
    */
-  async update(bugId: string, updates: UpdateBugInput): Promise<Bug> {
+  async update(bugId: string, updates: UpdateBugInput, currentBug?: Bug | null): Promise<Bug> {
     logger.debug('Updating bug', { bugId, updates });
 
+    const now = new Date();
     // Transform tags array to string if present
     const storageUpdates = transformBugForStorage({
       ...updates,
-      updatedAt: new Date(),
+      updatedAt: now,
     });
 
-    const updatedBug = await this.collectionDb.updateItem<Record<string, unknown>>(
+    const updatedBugPartial = await this.collectionDb.updateItem<Record<string, unknown>>(
       COLLECTION_SINGULAR,
       bugId,
-      storageUpdates
+      storageUpdates,
+      false // Skip fetch
     );
 
-    // Transform tags string to array
-    const transformedBug = transformBugFromStorage(updatedBug);
-
-    // Update cache
-    if (this.cacheService) {
-      this.cacheService.set(`bug:${bugId}`, transformedBug);
+    if (currentBug) {
+      const updatedBug = {
+        ...currentBug,
+        ...updates,
+        updatedAt: now,
+      };
+      
+      if (this.cacheService) {
+        this.cacheService.set(`bug:${bugId}`, updatedBug);
+      }
+      
+      return updatedBug;
     }
 
-    logger.info('Bug updated successfully', { bugId });
-    return transformedBug;
+    if (this.cacheService) {
+      const cachedBug = this.cacheService.get<Bug>(`bug:${bugId}`);
+      if (cachedBug) {
+        const updatedBug = {
+          ...cachedBug,
+          ...updates,
+          updatedAt: now,
+        };
+        this.cacheService.set(`bug:${bugId}`, updatedBug);
+        return updatedBug;
+      }
+    }
+
+    logger.warn('Current bug not provided and cache miss in update, fetching from DB', { bugId });
+    const fetchedBug = await this.getById(bugId);
+    if (!fetchedBug) {
+        throw new Error(`Bug not found after update: ${bugId}`);
+    }
+    return fetchedBug;
   }
 
   /**

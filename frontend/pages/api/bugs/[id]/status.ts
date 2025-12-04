@@ -133,8 +133,20 @@ export default async function handler(
       });
     }
     
-    // Update bug status
-    const updatedBug = await bugRepo.updateStatus(id, body.status);
+    let updatedBug;
+
+    // If moving from CLOSED to any other status, invalidate the bug
+    if (currentBug.status === BugStatus.CLOSED && body.status !== BugStatus.CLOSED) {
+      updatedBug = await bugRepo.update(id, {
+        status: body.status,
+        validated: false
+      }, currentBug);
+      
+      logger.info('Bug invalidated due to reopening', { bugId: id });
+    } else {
+      // Update bug status
+      updatedBug = await bugRepo.updateStatus(id, body.status, currentBug);
+    }
     
     // Log "status_changed" activity
     logger.debug('Logging status change activity', { bugId: id, newStatus: body.status });

@@ -13,6 +13,7 @@ import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } fr
 import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { useUser } from '@/contexts/UserContext';
 import { getUserName } from '@/utils/badgeHelpers';
+import { ValidationDialog } from '@/components/ValidationDialog';
 
 const formatDate = (date: Date | string) => {
   const d = new Date(date);
@@ -34,6 +35,8 @@ export default function SprintBoardPage() {
   const { users } = useUsers();
   
   const [dragStartStatus, setDragStartStatus] = useState<BugStatus | null>(null);
+  const [validationDialogOpen, setValidationDialogOpen] = useState(false);
+  const [pendingBugId, setPendingBugId] = useState<string | null>(null);
 
   // Find current sprint from the cached list
   const sprint = useMemo(() => 
@@ -162,6 +165,25 @@ export default function SprintBoardPage() {
 
     // Compare with oldStatus from the start of the drag
     if (newStatus && oldStatus && newStatus !== oldStatus) {
+      // Check for validation requirement
+      if (newStatus === BugStatus.CLOSED && !bug.validated) {
+        setPendingBugId(bug.id);
+        setValidationDialogOpen(true);
+        // Revert changes immediately
+        mutate(); 
+        return;
+      }
+
+      // Optimistic update: Invalidate if moving from CLOSED
+      if (oldStatus === BugStatus.CLOSED && newStatus !== BugStatus.CLOSED) {
+        if (bugsData) {
+          const updatedBugs = bugs.map(b => 
+            b.id === bug.id ? { ...b, validated: false } : b
+          );
+          mutate({ ...bugsData, bugs: updatedBugs }, false);
+        }
+      }
+
       try {
         if (currentUser) {
           await bugApi.updateStatus(bug.id, { 
@@ -176,6 +198,50 @@ export default function SprintBoardPage() {
         mutate();
       }
     }
+  };
+
+  const handleValidationConfirm = async () => {
+    if (pendingBugId && currentUser) {
+      const bugToUpdate = bugs.find(b => b.id === pendingBugId);
+      if (!bugToUpdate) return;
+
+      // Optimistic update
+      const updatedBugs = bugs.map(b => 
+        b.id === pendingBugId 
+          ? { ...b, status: BugStatus.CLOSED, validated: true } 
+          : b
+      );
+      
+      if (bugsData) {
+        mutate({ ...bugsData, bugs: updatedBugs }, false);
+      }
+
+      setValidationDialogOpen(false);
+      const bugId = pendingBugId;
+      setPendingBugId(null);
+
+      try {
+        // Validate first
+        await bugApi.validate(bugId, currentUser.id, currentUser.role);
+        // Then update status to CLOSED
+        await bugApi.updateStatus(bugId, {
+          status: BugStatus.CLOSED,
+          userId: currentUser.id,
+          userRole: currentUser.role as UserRole
+        });
+        // Revalidate to ensure consistency
+        mutate();
+      } catch (error) {
+        console.error('Failed to validate and close bug:', error);
+        // Revert changes on error (reload data)
+        mutate();
+      }
+    }
+  };
+
+  const handleValidationCancel = () => {
+    setValidationDialogOpen(false);
+    setPendingBugId(null);
   };
 
   if (!sprint) {
@@ -321,6 +387,13 @@ export default function SprintBoardPage() {
           </KanbanProvider>
         </div>
       </div>
+
+      <ValidationDialog 
+        open={validationDialogOpen} 
+        onOpenChange={setValidationDialogOpen}
+        onValidate={handleValidationConfirm}
+        onCancel={handleValidationCancel}
+      />
     </div>
   );
 }

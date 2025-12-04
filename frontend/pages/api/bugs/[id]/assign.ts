@@ -83,7 +83,7 @@ export default async function handler(
     }
     
     // Update bug assignment
-    const updatedBug = await bugRepo.updateAssignment(id, body.assignedTo);
+    const updatedBug = await bugRepo.updateAssignment(id, body.assignedTo, currentBug);
     
     // Log "assigned" activity
     logger.debug('Logging bug assignment activity', { bugId: id, assignedTo: body.assignedTo });

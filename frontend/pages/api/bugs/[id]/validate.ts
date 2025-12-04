@@ -116,7 +116,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse) {
     // Update bug to validated
     const updatedBug = await bugRepo.update(id, {
       validated: true,
-    });
+    }, bug);
     
     // Log "validated" activity
     logger.debug('Logging validation activity', { bugId: id, userId: body.userId });
