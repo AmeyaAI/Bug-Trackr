@@ -12,10 +12,10 @@ import {
   IconBug,
   IconFolder,
   IconHome,
+  IconSettings,
 } from "@tabler/icons-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarUserSelector } from "@/components/SidebarUserSelector";
 import { useUsers } from "@/lib/hooks/useData";
 import Link from "next/link";
@@ -50,6 +50,13 @@ export function AppSidebar({ children }: AppSidebarProps) {
         <IconFolder className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
     },
+    {
+      label: "Settings",
+      href: "/settings",
+      icon: (
+        <IconSettings className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+      ),
+    },
   ];
 
   return (
@@ -76,11 +83,6 @@ export function AppSidebar({ children }: AppSidebarProps) {
                 <SidebarUserSelector users={users} isOpen={open} />
               </div>
             )}
-            
-            {/* Theme Toggle */}
-            <div className="border-t border-neutral-200 dark:border-neutral-700 pt-2">
-              <ThemeToggle showLabel={open} className="w-full" />
-            </div>
           </div>
         </SidebarBody>
       </Sidebar>

@@ -7,18 +7,16 @@ import { logger } from '@/lib/utils/logger';
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { projectId } = req.query;
-    
-    if (!projectId || typeof projectId !== 'string') {
-      return res.status(400).json({
-        error: 'Invalid query parameters',
-        details: 'projectId is required',
-      });
-    }
-
     const services = getServiceContainer();
     const sprintRepo = services.getSprintRepository();
     
-    const sprints = await sprintRepo.getByProject(projectId);
+    if (projectId && typeof projectId === 'string') {
+      const sprints = await sprintRepo.getByProject(projectId);
+      return res.status(200).json(sprints);
+    }
+
+    // If no projectId provided, return all sprints
+    const sprints = await sprintRepo.getAll();
     return res.status(200).json(sprints);
   } catch (error) {
     logger.error('Error fetching sprints', { error });

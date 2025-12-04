@@ -14,6 +14,7 @@ export interface Sprint {
   endDate: Date;
   goal?: string;          // Optional description
   status: SprintStatus;
+  bugIds?: string[];      // IDs of bugs in this sprint
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

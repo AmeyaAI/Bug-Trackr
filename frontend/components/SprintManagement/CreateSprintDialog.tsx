@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,6 +9,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,17 +31,50 @@ export function CreateSprintDialog({ projectId, onSprintCreated }: CreateSprintD
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { success, error } = useToast();
+  const [isAdvanced, setIsAdvanced] = useState(false);
+  const [duration, setDuration] = useState('1'); // Default 1 week
 
   const [formData, setFormData] = useState({
     name: '',
-    startDate: '',
+    startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     goal: '',
   });
 
+  // Calculate end date based on start date and duration
+  useEffect(() => {
+    if (isAdvanced) return;
+
+    if (formData.startDate && duration) {
+      const start = new Date(formData.startDate);
+      const end = new Date(start);
+      
+      if (duration === '4') {
+        // 1 Month
+        end.setMonth(end.getMonth() + 1);
+      } else {
+        // Weeks
+        end.setDate(end.getDate() + (parseInt(duration) * 7));
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        endDate: end.toISOString().split('T')[0]
+      }));
+    }
+  }, [formData.startDate, duration, isAdvanced]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDurationChange = (value: string) => {
+    setDuration(value);
+  };
+
+  const toggleAdvanced = () => {
+    setIsAdvanced(!isAdvanced);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,10 +108,12 @@ export function CreateSprintDialog({ projectId, onSprintCreated }: CreateSprintD
       setOpen(false);
       setFormData({
         name: '',
-        startDate: '',
+        startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         goal: '',
       });
+      setDuration('1');
+      setIsAdvanced(false);
       onSprintCreated();
     } catch (err) {
       console.error('Failed to create sprint:', err);
@@ -123,20 +165,55 @@ export function CreateSprintDialog({ projectId, onSprintCreated }: CreateSprintD
                 required
               />
             </div>
+            
+            {!isAdvanced ? (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="duration" className="text-right">
+                  Duration
+                </Label>
+                <div className="col-span-3">
+                  <Select value={duration} onValueChange={handleDurationChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 Week</SelectItem>
+                      <SelectItem value="2">2 Weeks</SelectItem>
+                      <SelectItem value="4">4 Weeks</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="endDate" className="text-right">
+                  End Date
+                </Label>
+                <Input
+                  id="endDate"
+                  name="endDate"
+                  type="date"
+                  value={formData.endDate}
+                  onChange={handleChange}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="endDate" className="text-right">
-                End Date
-              </Label>
-              <Input
-                id="endDate"
-                name="endDate"
-                type="date"
-                value={formData.endDate}
-                onChange={handleChange}
-                className="col-span-3"
-                required
-              />
+              <div className="col-start-2 col-span-3">
+                <Button 
+                  type="button" 
+                  variant="link" 
+                  className="p-0 h-auto text-xs text-muted-foreground"
+                  onClick={toggleAdvanced}
+                >
+                  {isAdvanced ? 'standard durations' : 'Advanced'}
+                </Button>
+              </div>
             </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="goal" className="text-right">
                 Goal

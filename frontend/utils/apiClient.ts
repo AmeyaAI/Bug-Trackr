@@ -397,6 +397,14 @@ export const activityLogApi = {
 // Sprint API endpoints
 export const sprintApi = {
   /**
+   * Get all sprints
+   */
+  getAll: async (): Promise<Sprint[]> => {
+    const response = await apiClient.get<Sprint[]>('/api/sprints');
+    return response.data.map(transformDates);
+  },
+
+  /**
    * Get sprints by project ID
    */
   getByProject: async (projectId: string): Promise<Sprint[]> => {
@@ -404,6 +412,14 @@ export const sprintApi = {
       params: { projectId },
     });
     return response.data.map(transformDates);
+  },
+
+  /**
+   * Update sprint
+   */
+  update: async (id: string, data: Partial<Sprint>): Promise<Sprint> => {
+    const response = await apiClient.patch<Sprint>(`/api/sprints/${id}`, data);
+    return transformDates(response.data);
   },
 };
 

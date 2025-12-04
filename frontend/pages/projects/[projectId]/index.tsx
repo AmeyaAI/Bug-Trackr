@@ -15,15 +15,14 @@ import { PriorityIcon } from '@/components/PriorityIcon';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { bugApi, projectApi } from '@/utils/apiClient';
-import { Bug, BugStatus, BugPriority, Project, UserRole } from '@/utils/types';
+import { Bug, BugStatus, BugPriority, Project } from '@/utils/types';
 import { BugType } from '@/lib/models/bug';
 import { useUser } from '@/contexts/UserContext';
 import { useUsers } from '@/lib/hooks/useData';
 import { LoadingState } from '@/components/LoadingState';
 import { ApiErrorFallback } from '@/components/ApiErrorFallback';
 import { getStatusBadgeVariant, getPriorityBadgeVariant, formatRelativeTime, getUserName } from '@/utils/badgeHelpers';
-import { CreateSprintDialog } from '@/components/SprintManagement/CreateSprintDialog';
-import { LayoutGrid, List, Filter, ChevronsUpDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, ChevronsUpDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   TableBody,
   TableCell,
@@ -40,8 +39,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
-import { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { ColumnDef } from '@tanstack/react-table';
 
 // Bug type display helper
@@ -110,7 +107,7 @@ const BUG_TYPE_CONFIG: Record<BugType, { label: string; icon: React.ReactNode; v
 
 export default function ProjectBugsPage() {
   const router = useRouter();
-  const { id: projectId } = router.query;
+  const { projectId } = router.query;
   const { currentUser } = useUser();
   const { users } = useUsers();
   
@@ -125,8 +122,6 @@ export default function ProjectBugsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
-  const [dragStartStatus, setDragStartStatus] = useState<BugStatus | null>(null);
 
   // Pagination states
   const [page, setPage] = useState(1);
@@ -220,9 +215,8 @@ export default function ProjectBugsPage() {
     const inProgress = bugs.filter(b => b.status === BugStatus.IN_PROGRESS).length;
     const resolved = bugs.filter(b => b.status === BugStatus.RESOLVED).length;
     const closed = bugs.filter(b => b.status === BugStatus.CLOSED).length;
-    const highest = bugs.filter(b => b.priority === BugPriority.HIGHEST).length;
     
-    return { total, open, inProgress, resolved, closed, highest };
+    return { total, open, inProgress, resolved, closed };
   };
 
   // Define table columns with filter dropdowns
@@ -444,64 +438,7 @@ export default function ProjectBugsPage() {
     },
   ];
 
-  const kanbanColumns = [
-    { id: BugStatus.OPEN, name: 'Open' },
-    { id: BugStatus.IN_PROGRESS, name: 'In Progress' },
-    { id: BugStatus.RESOLVED, name: 'Resolved' },
-    { id: BugStatus.CLOSED, name: 'Closed' },
-  ];
 
-  const handleKanbanDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const currentColumn = active.data.current?.column as BugStatus;
-    if (currentColumn) {
-      setDragStartStatus(currentColumn);
-    }
-  };
-
-  const handleKanbanDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    
-    if (!over) {
-      setDragStartStatus(null);
-      return;
-    }
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    const oldStatus = dragStartStatus;
-    setDragStartStatus(null);
-
-    const bug = bugs.find(b => b.id === activeId);
-    if (!bug) return;
-
-    let newStatus: BugStatus | undefined;
-
-    if (Object.values(BugStatus).includes(overId as BugStatus)) {
-      newStatus = overId as BugStatus;
-    } else {
-      const overBug = bugs.find(b => b.id === overId);
-      if (overBug) {
-        newStatus = overBug.status;
-      }
-    }
-
-    if (newStatus && oldStatus && newStatus !== oldStatus) {
-      try {
-        if (currentUser) {
-          await bugApi.updateStatus(bug.id, { 
-            status: newStatus,
-            userId: currentUser.id,
-            userRole: currentUser.role as UserRole
-          });
-        }
-      } catch (error) {
-        console.error('Failed to update bug status:', error);
-        loadData();
-      }
-    }
-  };
 
   if (isLoading && !project) {
     return <LoadingState message="Loading project..." fullScreen />;
@@ -543,10 +480,9 @@ export default function ProjectBugsPage() {
               </div>
               {currentUser && (
                 <div className="flex gap-2">
-                  <CreateSprintDialog 
-                    projectId={project.id} 
-                    onSprintCreated={() => loadData(1, null)} 
-                  />
+                  <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/sprints`)}>
+                    View Sprints
+                  </Button>
                   <Button onClick={handleCreateBug}>
                     Create Bug
                   </Button>
@@ -555,7 +491,7 @@ export default function ProjectBugsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Total</p>
                 <p className="text-2xl font-bold">{stats.total}</p>
@@ -576,10 +512,6 @@ export default function ProjectBugsPage() {
                 <p className="text-sm text-muted-foreground">Closed</p>
                 <p className="text-2xl font-bold text-green-600">{stats.closed}</p>
               </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Highest</p>
-                <p className="text-2xl font-bold text-red-600">{stats.highest}</p>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -591,26 +523,6 @@ export default function ProjectBugsPage() {
             <p className="text-muted-foreground text-sm mt-1">
               Manage bugs for this project
             </p>
-          </div>
-          <div className="flex items-center border rounded-md p-1 bg-muted/20">
-            <Button
-              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-              className="h-8 px-3"
-            >
-              <List className="h-4 w-4 mr-2" />
-              Table
-            </Button>
-            <Button
-              variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('kanban')}
-              className="h-8 px-3"
-            >
-              <LayoutGrid className="h-4 w-4 mr-2" />
-              Kanban
-            </Button>
           </div>
         </div>
 
@@ -629,8 +541,7 @@ export default function ProjectBugsPage() {
           Showing {filteredBugs.length} bugs on this page (Page {page})
         </div>
 
-        {viewMode === 'table' ? (
-          /* Bug table */
+          {/* Bug table */}
           <div className="bg-card rounded-lg border">
             <TableProvider columns={columns} data={filteredBugs}>
               <TableHeader>
@@ -663,70 +574,6 @@ export default function ProjectBugsPage() {
               </TableBody>
             </TableProvider>
           </div>
-        ) : (
-          /* Kanban Board */
-          <div className="h-[calc(100vh-400px)] min-h-[500px]">
-            <KanbanProvider
-              columns={kanbanColumns}
-              data={filteredBugs.map(b => ({ ...b, name: b.title, column: b.status }))}
-              onDataChange={(newData) => {
-                const updatedBugsMap = new Map(newData.map(item => [item.id, item]));
-                
-                setBugs(prevBugs => prevBugs.map(bug => {
-                  const updatedItem = updatedBugsMap.get(bug.id);
-                  if (updatedItem) {
-                    return { ...bug, status: updatedItem.column as BugStatus };
-                  }
-                  return bug;
-                }));
-              }}
-              onDragStart={handleKanbanDragStart}
-              onDragEnd={handleKanbanDragEnd}
-            >
-              {(column) => (
-                <KanbanBoard key={column.id} id={column.id}>
-                  <KanbanHeader>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{column.name}</span>
-                      <Badge variant="secondary" className="ml-2">
-                        {filteredBugs.filter(b => b.status === column.id).length}
-                      </Badge>
-                    </div>
-                  </KanbanHeader>
-                  <KanbanCards id={column.id}>
-                    {(item) => {
-                      const bug = item as unknown as Bug;
-                      const typeConfig = BUG_TYPE_CONFIG[bug.type] || BUG_TYPE_CONFIG.bug;
-                      return (
-                        <KanbanCard key={bug.id} id={bug.id} name={bug.title} column={bug.status} className="cursor-pointer" onClick={() => handleViewDetails(bug.id)}>
-                          <div className="flex flex-col gap-2">
-                            <div className="font-medium text-sm">{bug.title}</div>
-                            <div className="flex items-center justify-between mt-2">
-                              <div className="flex items-center gap-1">
-                                <Badge variant={getPriorityBadgeVariant(bug.priority)} className="text-[10px] px-1 py-0 h-5">
-                                  {bug.priority}
-                                </Badge>
-                                <Badge variant={typeConfig.variant} className={`${typeConfig.className || ''} text-[10px] px-1 py-0 h-5 flex items-center gap-0.5`}>
-                                  {typeConfig.icon}
-                                  {typeConfig.label}
-                                </Badge>
-                              </div>
-                              {bug.assignedTo && (
-                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium" title={getUserName(bug.assignedTo, users)}>
-                                  {getUserName(bug.assignedTo, users).charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </KanbanCard>
-                      );
-                    }}
-                  </KanbanCards>
-                </KanbanBoard>
-              )}
-            </KanbanProvider>
-          </div>
-        )}
 
         {/* Pagination */}
         <div className="flex items-center justify-end space-x-2 py-4">

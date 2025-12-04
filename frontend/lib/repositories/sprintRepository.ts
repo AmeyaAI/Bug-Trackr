@@ -26,6 +26,7 @@ function transformSprintFromStorage(sprint: Record<string, unknown>): Sprint {
   const name = (sprint.name || '') as string;
   const goal = (sprint.goal || '') as string;
   const status = (sprint.status || 'planned') as SprintStatus;
+  const bugIds = (sprint.bug_tracking_bugss || []) as string[];
   
   const startDate = parseDate(sprint.startDate || sprint.start_date);
   const endDate = parseDate(sprint.endDate || sprint.end_date);
@@ -40,6 +41,7 @@ function transformSprintFromStorage(sprint: Record<string, unknown>): Sprint {
     endDate,
     goal,
     status,
+    bugIds,
     createdAt,
     updatedAt,
   };
@@ -75,8 +77,44 @@ export class SprintRepository {
     
     // Invalidate cache for this project
     this.cacheService.delete(`sprints:project:${data.projectId}`);
+    this.cacheService.delete('sprints:all');
     
     logger.info('Sprint created successfully', { id: sprint.id, name: sprint.name });
+    return sprint;
+  }
+
+  /**
+   * Checks and updates sprint status based on dates
+   * This is a "lazy update" mechanism to ensure statuses are correct when fetched
+   */
+  private async checkAndUpdateStatus(sprint: Sprint): Promise<Sprint> {
+    const now = new Date();
+    let newStatus: SprintStatus | null = null;
+
+    // If planned but start date reached/passed -> Active
+    if (sprint.status === 'planned' && now >= sprint.startDate) {
+      newStatus = 'active';
+    }
+    // If active but end date passed -> Completed
+    else if (sprint.status === 'active' && now > sprint.endDate) {
+      newStatus = 'completed';
+    }
+
+    if (newStatus) {
+      logger.info('Auto-updating sprint status', { 
+        id: sprint.id, 
+        oldStatus: sprint.status, 
+        newStatus,
+        reason: 'Date-based auto-transition' 
+      });
+      
+      // Update in DB
+      await this.update(sprint.id, { status: newStatus });
+      
+      // Return updated object
+      return { ...sprint, status: newStatus };
+    }
+
     return sprint;
   }
 
@@ -86,17 +124,18 @@ export class SprintRepository {
   async getById(id: string): Promise<Sprint | null> {
     logger.debug('Fetching sprint by ID', { id });
 
-    const sprint = await this.collectionDb.getItemById<Record<string, unknown>>(
+    const sprintData = await this.collectionDb.getItemById<Record<string, unknown>>(
       COLLECTION_SINGULAR,
       id
     );
 
-    if (!sprint) {
+    if (!sprintData) {
       logger.debug('Sprint not found', { id });
       return null;
     }
 
-    return transformSprintFromStorage(sprint);
+    const sprint = transformSprintFromStorage(sprintData);
+    return this.checkAndUpdateStatus(sprint);
   }
 
   /**
@@ -118,6 +157,7 @@ export class SprintRepository {
     
     // Invalidate cache for this project
     this.cacheService.delete(`sprints:project:${sprint.projectId}`);
+    this.cacheService.delete('sprints:all');
 
     logger.info('Sprint updated successfully', { id });
     return sprint;
@@ -153,10 +193,46 @@ export class SprintRepository {
 
     const transformedSprints = sprints.map(transformSprintFromStorage);
     
+    // Check and update statuses in parallel
+    const updatedSprints = await Promise.all(
+      transformedSprints.map(sprint => this.checkAndUpdateStatus(sprint))
+    );
+    
+    // Update cache with potentially updated statuses
+    this.cacheService.set(cacheKey, updatedSprints);
+
+    logger.info('Sprints fetched by project successfully', { projectId, count: updatedSprints.length });
+    return updatedSprints;
+  }
+
+  /**
+   * Retrieves all sprints
+   */
+  async getAll(): Promise<Sprint[]> {
+    // Check cache first
+    const cacheKey = 'sprints:all';
+    const cached = this.cacheService.get<Sprint[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    logger.debug('Fetching all sprints');
+
+    const sprints = await this.collectionDb.queryItems<Record<string, unknown>>(
+      COLLECTION_PLURAL,
+      [],
+      {
+        includeDetail: false,
+        pageSize: 1000,
+      }
+    );
+
+    const transformedSprints = sprints.map(transformSprintFromStorage);
+    
     // Update cache
     this.cacheService.set(cacheKey, transformedSprints);
-
-    logger.info('Sprints fetched by project successfully', { projectId, count: transformedSprints.length });
+    
+    logger.info('All sprints fetched successfully', { count: transformedSprints.length });
     return transformedSprints;
   }
 }

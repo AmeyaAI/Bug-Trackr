@@ -54,7 +54,7 @@ export function getBugTypeBorderClass(type: BugType | string): string {
  */
 export function getPriorityBadgeVariant(
   priority: BugPriority
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+): 'default' | 'secondary' | 'destructive' | 'outline' | 'priority-highest' | 'priority-high' | 'priority-medium' | 'priority-low' | 'priority-lowest' {
   return BADGE_VARIANTS.PRIORITY[priority] || 'outline';
 }
 

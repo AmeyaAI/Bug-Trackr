@@ -19,18 +19,23 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { useProjects, useBugs } from '@/lib/hooks/useData';
+import { useProjects, useBugs, useAllSprints } from '@/lib/hooks/useData';
 
 export default function ProjectsPage() {
   const router = useRouter();
 
   const { projects, isLoading: isLoadingProjects, isError: projectsError } = useProjects();
   const { bugs, isLoading: isLoadingBugs, isError: bugsError } = useBugs();
-  const [searchQuery, setSearchQuery] = useState('');  const isLoading = isLoadingProjects || isLoadingBugs;
-  const error = projectsError || bugsError ? 'Failed to load data' : null;
+  const { sprints, isLoading: isLoadingSprints, isError: sprintsError } = useAllSprints();
+  const [searchQuery, setSearchQuery] = useState('');  const isLoading = isLoadingProjects || isLoadingBugs || isLoadingSprints;
+  const error = projectsError || bugsError || sprintsError ? 'Failed to load data' : null;
 
   const handleViewProject = (projectId: string) => {
     router.push(`/projects/${projectId}`);
+  };
+
+  const handleViewSprints = (projectId: string) => {
+    router.push(`/projects/${projectId}/sprints`);
   };
 
   // Get bug count for a project
@@ -41,6 +46,11 @@ export default function ProjectsPage() {
   // Get open bug count for a project
   const getOpenBugCount = (projectId: string): number => {
     return bugs.filter(bug => bug.projectId === projectId && bug.status === 'Open').length;
+  };
+
+  // Get sprint count for a project
+  const getSprintCount = (projectId: string): number => {
+    return sprints.filter(sprint => sprint.projectId === projectId).length;
   };
 
   // Filter projects based on search query
@@ -118,6 +128,7 @@ export default function ProjectsPage() {
             {filteredProjects.map((project) => {
               const totalBugs = getBugCount(project.id);
               const openBugs = getOpenBugCount(project.id);
+              const totalSprints = getSprintCount(project.id);
               
               return (
                 <Card key={project.id} className="hover:shadow-md transition-shadow">
@@ -144,16 +155,27 @@ export default function ProjectsPage() {
                           {totalBugs - openBugs}
                         </span>
                       </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Total Sprints:</span>
+                        <span className="font-medium">{totalSprints}</span>
+                      </div>
                     </div>
                   </CardContent>
 
-                  <CardFooter>
+                  <CardFooter className="flex flex-col gap-2">
                     <Button
                       variant="outline"
                       className="w-full"
                       onClick={() => handleViewProject(project.id)}
                     >
                       View Bugs
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => handleViewSprints(project.id)}
+                    >
+                      View Sprints
                     </Button>
                   </CardFooter>
                 </Card>

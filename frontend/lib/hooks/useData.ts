@@ -115,6 +115,23 @@ export function useSprints(projectId: string | 'all') {
 }
 
 /**
+ * Hook to fetch all sprints with caching
+ */
+export function useAllSprints() {
+  const { data, error, isLoading, mutate } = useSWR<Sprint[]>('/api/sprints', () => sprintApi.getAll(), {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000, // 1 minute
+  });
+
+  return {
+    sprints: data || [],
+    isLoading,
+    isError: error,
+    mutate
+  };
+}
+
+/**
  * Hook to fetch all activity logs without caching
  */
 export function useActivityLogs() {
