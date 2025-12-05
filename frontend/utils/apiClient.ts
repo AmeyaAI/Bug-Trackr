@@ -1,10 +1,12 @@
 /**
- * Axios API client configuration for BugTrackr backend
- * Handles request/response transformation, error handling, and interceptors
+ * Client-side API client for BugTrackr
+ * Directly uses repositories via ServiceContainer instead of HTTP API routes
  */
 
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import { Sprint } from '../lib/models/sprint';
+import { getServiceContainer } from '../lib/services/serviceContainer';
+import { Sprint, CreateSprintInput } from '../lib/models/sprint';
+import { BugTag, BugStatus } from '../lib/models/bug';
+import { Activity } from '../lib/models/activity';
 import type {
   Bug,
   Comment,
@@ -23,7 +25,6 @@ import type {
   CommentResponse,
   ProjectResponse,
 } from './types';
-import { constructBugFilters } from './apiHelpers';
 
 // Track request count for loading state
 let activeRequests = 0;
@@ -43,150 +44,70 @@ const notifyRequestListeners = () => {
   requestListeners.forEach(listener => listener(activeRequests));
 };
 
-// API configuration - using relative paths for Next.js API routes
-// No baseURL needed since we're using relative paths (/api/*)
-const apiClient: AxiosInstance = axios.create({
-  timeout: 60000, // Increased timeout to 60s to handle slow backend operations
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    // Track active requests
-    activeRequests++;
-    notifyRequestListeners();
-    
-    // Log request in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
-    }
-    return config;
-  },
-  (error: AxiosError) => {
-    activeRequests--;
-    notifyRequestListeners();
-    console.error('[API Request Error]', error);
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor
-apiClient.interceptors.response.use(
-  (response: AxiosResponse) => {
-    // Track active requests
-    activeRequests--;
-    notifyRequestListeners();
-    
-    // Log response in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.status);
-    }
-    return response;
-  },
-  (error: AxiosError<ApiErrorResponse>) => {
-    // Track active requests
-    activeRequests--;
-    notifyRequestListeners();
-    
-    // Handle errors
-    const errorMessage = handleApiError(error);
-    console.error('[API Response Error]', errorMessage);
-    return Promise.reject(error);
-  }
-);
-
 /**
- * API Error Response structure (Next.js API routes format)
+ * Wraps a promise to track active requests for loading indicators
  */
-export interface ApiErrorResponse {
-  error?: string;           // Human-readable error message
-  details?: unknown;        // Optional additional context (e.g., Zod validation errors)
-  code?: string;            // Optional error code for client handling
-}
+const trackRequest = async <T>(promise: Promise<T>): Promise<T> => {
+  activeRequests++;
+  notifyRequestListeners();
+  try {
+    const result = await promise;
+    return result;
+  } catch (error) {
+    console.error('[API Request Error]', error);
+    throw error;
+  } finally {
+    activeRequests--;
+    notifyRequestListeners();
+  }
+};
 
 /**
  * Handle API errors and return user-friendly messages
  */
-export const handleApiError = (error: AxiosError<ApiErrorResponse>): string => {
-  if (error.response) {
-    // Server responded with error status
-    const status = error.response.status;
-    const data = error.response.data;
-    
-    // Try to extract error message from new format first
-    if (data?.error) {
-      return data.error;
-    }
-    
-    // Fallback to status-based messages
-    switch (status) {
-      case 400:
-        // Check if details contains Zod validation errors
-        if (data?.details && Array.isArray(data.details)) {
-          return data.details.map((err: unknown) => {
-            if (typeof err === 'object' && err !== null) {
-              const errObj = err as Record<string, unknown>;
-              return errObj.message || JSON.stringify(err);
-            }
-            return String(err);
-          }).join(', ');
-        }
-        return 'Invalid request. Please check your input.';
-      case 401:
-        return 'Unauthorized. Please log in again.';
-      case 403:
-        return 'You do not have permission to perform this action.';
-      case 404:
-        return 'Resource not found.';
-      case 405:
-        return 'Method not allowed.';
-      case 500:
-        return 'Server error. Please try again later.';
-      default:
-        return `Error: ${status}`;
-    }
-  } else if (error.request) {
-    // Request made but no response
-    return 'Network error. Please check your connection.';
-  } else {
-    // Error setting up request
-    return error.message || 'An unexpected error occurred.';
+export const handleApiError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
   }
+  return 'An unexpected error occurred.';
 };
 
 /**
- * Transform backend date strings to Date objects
+ * Helper to enrich Activity with related data to match ActivityLog interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const transformDates = <T extends Record<string, any>>(data: T): T => {
-  const dateFields = ['createdAt', 'updatedAt', 'timestamp'];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const transformed = { ...data } as Record<string, any>;
+const enrichActivity = async (activity: Activity): Promise<ActivityLog> => {
+  const services = getServiceContainer();
+  
+  const [bug, user] = await Promise.all([
+    services.getBugRepository().getById(activity.bugId),
+    services.getUserRepository().getById(activity.authorId)
+  ]);
 
-  dateFields.forEach(field => {
-    if (transformed[field] && typeof transformed[field] === 'string') {
-      transformed[field] = new Date(transformed[field]);
-    }
-  });
-  return transformed as T;
+  let project = null;
+  if (bug) {
+    project = await services.getProjectRepository().getById(bug.projectId);
+  }
+
+  return {
+    id: activity.id,
+    bugId: activity.bugId,
+    bugTitle: bug?.title || 'Unknown Bug',
+    projectId: project?.id || 'unknown',
+    projectName: project?.name || 'Unknown Project',
+    action: activity.action,
+    performedBy: activity.authorId,
+    performedByName: user?.name || 'Unknown User',
+    timestamp: activity.timestamp,
+  };
 };
 
 // Bug API endpoints
 export const bugApi = {
-  /**
-   * Get all bugs
-   */
   getAll: async (): Promise<Bug[]> => {
-    const response = await apiClient.get<Bug[]>('/api/bugs');
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    return trackRequest(services.getBugRepository().getAll());
   },
 
-  /**
-   * Get bugs with pagination and filters
-   */
   getPaginated: async (
     pageSize: number, 
     lastEvaluatedKey?: string,
@@ -201,227 +122,207 @@ export const bugApi = {
       sprintId?: string | null;
     }
   ): Promise<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }> => {
-    const params: Record<string, string> = {
-      page_size: pageSize.toString(),
-      include_detail: 'false',
-    };
-
-    if (lastEvaluatedKey) {
-      params.last_evaluated_key = lastEvaluatedKey;
-    }
+    const services = getServiceContainer();
+    const repo = services.getBugRepository();
 
     if (filters) {
-      const filterArray = constructBugFilters(filters);
-      if (filterArray.length > 0) {
-        params.filters = JSON.stringify(filterArray);
-      }
+        return trackRequest(repo.search({
+            projectId: filters.projectId,
+            status: filters.status as any,
+            assignedTo: filters.assignedTo,
+            priority: filters.priority as any,
+            searchQuery: filters.search
+        }, pageSize, lastEvaluatedKey));
     }
 
-    const response = await apiClient.get<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }>('/api/bugs', {
-      params,
-    });
-    
-    return {
-      bugs: response.data.bugs.map(transformDates),
-      lastEvaluatedKey: response.data.lastEvaluatedKey,
-    };
+    return trackRequest(repo.getAllPaginated(pageSize, lastEvaluatedKey));
   },
 
-  /**
-   * Get bug by ID with comments
-   */
   getById: async (id: string): Promise<BugWithCommentsResponse> => {
-    const response = await apiClient.get<BugWithCommentsResponse>(`/api/bugs/${id}`);
+    const services = getServiceContainer();
+    const bugRepo = services.getBugRepository();
+    const commentRepo = services.getCommentRepository();
+
+    const bugPromise = bugRepo.getById(id);
+    const commentsPromise = commentRepo.getByBug(id);
+
+    const [bug, comments] = await trackRequest(Promise.all([bugPromise, commentsPromise]));
+
+    if (!bug) {
+      throw new Error('Bug not found');
+    }
+
     return {
-      bug: transformDates(response.data.bug),
-      comments: response.data.comments.map(transformDates),
+      bug,
+      comments,
     };
   },
 
-  /**
-   * Create new bug
-   */
   create: async (data: BugCreateRequest): Promise<BugResponse> => {
-    // Next.js API routes expect JSON
-    const response = await apiClient.post<BugResponse>('/api/bugs', data);
-    return transformDates(response.data);
+    const services = getServiceContainer();
+    const createInput = {
+        ...data,
+        status: BugStatus.OPEN,
+        validated: false,
+        assignedTo: null,
+        attachments: ''
+    };
+    const bug = await trackRequest(services.getBugRepository().create(createInput));
+    return bug;
   },
 
-  /**
-   * Update bug status
-   */
   updateStatus: async (id: string, data: BugStatusUpdateRequest): Promise<StatusUpdateResponse> => {
-    const response = await apiClient.patch<StatusUpdateResponse>(`/api/bugs/${id}/status`, data);
-    if (response.data.bug) {
-      response.data.bug = transformDates(response.data.bug);
-    }
-    return response.data;
+    const services = getServiceContainer();
+    const bug = await trackRequest(services.getBugRepository().updateStatus(id, data.status as BugStatus));
+    return { success: true, bug, message: 'Status updated' };
   },
 
-  /**
-   * Validate bug (tester only)
-   */
-  validate: async (id: string, userId: string, userRole: string = 'tester'): Promise<StatusUpdateResponse> => {
-    const response = await apiClient.patch<StatusUpdateResponse>(`/api/bugs/${id}/validate`, {
-      userId,
-      userRole,
-    });
-    if (response.data.bug) {
-      response.data.bug = transformDates(response.data.bug);
-    }
-    return response.data;
+  validate: async (id: string, userId: string, _userRole: string = 'tester'): Promise<StatusUpdateResponse> => {
+    const services = getServiceContainer();
+    const bugRepo = services.getBugRepository();
+    const bug = await trackRequest(bugRepo.update(id, { validated: true }));
+    return { success: true, bug, message: 'Validated' };
   },
 
-
-  /**
-   * Assign bug to user
-   */
   assign: async (id: string, data: BugAssignRequest): Promise<AssignmentResponse> => {
-    const response = await apiClient.patch<AssignmentResponse>(`/api/bugs/${id}/assign`, data);
-    if (response.data.bug) {
-      response.data.bug = transformDates(response.data.bug);
-    }
-    return response.data;
+    const services = getServiceContainer();
+    const bug = await trackRequest(services.getBugRepository().updateAssignment(id, data.assignedTo));
+    return { success: true, bug, message: 'Assigned' };
   },
 
-  /**
-   * Update bug sprint (admin only)
-   */
-  updateSprint: async (id: string, sprintId: string | null, userRole: string): Promise<BugResponse> => {
-    const response = await apiClient.patch<{ success: boolean, bug: BugResponse }>(`/api/bugs/${id}`, {
-      sprintId,
-      userRole,
-    });
-    return transformDates(response.data.bug);
+  updateSprint: async (id: string, sprintId: string | null, _userRole: string): Promise<BugResponse> => {
+    const services = getServiceContainer();
+    const bug = await trackRequest(services.getBugRepository().update(id, { sprintId }));
+    return bug;
   },
 
-  /**
-   * Update bug tags
-   */
   updateTags: async (id: string, tags: string[]): Promise<BugResponse> => {
-    const response = await apiClient.patch<{ success: boolean, bug: BugResponse }>(`/api/bugs/${id}`, {
-      tags,
-    });
-    return transformDates(response.data.bug);
+    const services = getServiceContainer();
+    const bug = await trackRequest(services.getBugRepository().update(id, { tags: tags as BugTag[] }));
+    return bug;
   },
 };
 
 // Comment API endpoints
 export const commentApi = {
-  /**
-   * Create new comment
-   */
   create: async (data: CommentCreateRequest): Promise<CommentResponse> => {
-    const response = await apiClient.post<CommentResponse>('/api/comments', data);
-    return transformDates(response.data);
+    const services = getServiceContainer();
+    const comment = await trackRequest(services.getCommentRepository().create(data));
+    return comment;
   },
 
-  /**
-   * Get comments for a bug
-   */
   getByBugId: async (bugId: string): Promise<Comment[]> => {
-    const response = await apiClient.get<Comment[]>('/api/comments', {
-      params: { bugId },
-    });
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    return trackRequest(services.getCommentRepository().getByBug(bugId));
   },
 };
 
 // Project API endpoints
 export const projectApi = {
-  /**
-   * Get all projects
-   */
   getAll: async (): Promise<Project[]> => {
-    const response = await apiClient.get<Project[]>('/api/projects');
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    return trackRequest(services.getProjectRepository().getAll());
   },
 
-  /**
-   * Create new project
-   */
   create: async (data: ProjectCreateRequest): Promise<ProjectResponse> => {
-    const response = await apiClient.post<ProjectResponse>('/api/projects', data);
-    return transformDates(response.data);
+    const services = getServiceContainer();
+    const project = await trackRequest(services.getProjectRepository().create(data));
+    return project;
   },
 
-  /**
-   * Get project by ID
-   */
   getById: async (id: string): Promise<ProjectResponse> => {
-    const response = await apiClient.get<ProjectResponse>(`/api/projects/${id}`);
-    return transformDates(response.data);
+    const services = getServiceContainer();
+    const project = await trackRequest(services.getProjectRepository().getById(id));
+    if (!project) throw new Error('Project not found');
+    return project;
   },
 };
 
 // User API endpoints
 export const userApi = {
-  /**
-   * Get all users
-   */
   getAll: async (): Promise<User[]> => {
-    const response = await apiClient.get<User[]>('/api/users');
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    return trackRequest(services.getUserRepository().getAll());
   },
 
-  /**
-   * Get user by ID
-   */
   getById: async (id: string): Promise<User> => {
-    const response = await apiClient.get<User>(`/api/users/${id}`);
-    return transformDates(response.data);
+    const services = getServiceContainer();
+    const user = await trackRequest(services.getUserRepository().getById(id));
+    if (!user) throw new Error('User not found');
+    return user;
   },
 };
 
 // Activity Log API endpoints
 export const activityLogApi = {
-  /**
-   * Get all activity logs
-   */
   getAll: async (): Promise<ActivityLog[]> => {
-    const response = await apiClient.get<ActivityLog[]>('/api/activities');
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    const activities = await trackRequest(services.getActivityRepository().getAll());
+    return Promise.all(activities.map(enrichActivity));
   },
 
-  /**
-   * Get activity logs for a specific bug
-   */
   getByBugId: async (bugId: string): Promise<ActivityLog[]> => {
-    const response = await apiClient.get<ActivityLog[]>('/api/activities', {
-      params: { bugId },
-    });
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    const activities = await trackRequest(services.getActivityRepository().getByBug(bugId));
+    return Promise.all(activities.map(enrichActivity));
   },
 };
 
 // Sprint API endpoints
 export const sprintApi = {
-  /**
-   * Get all sprints
-   */
   getAll: async (): Promise<Sprint[]> => {
-    const response = await apiClient.get<Sprint[]>('/api/sprints');
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    return trackRequest(services.getSprintRepository().getAll());
   },
 
-  /**
-   * Get sprints by project ID
-   */
   getByProject: async (projectId: string): Promise<Sprint[]> => {
-    const response = await apiClient.get<Sprint[]>('/api/sprints', {
-      params: { projectId },
-    });
-    return response.data.map(transformDates);
+    const services = getServiceContainer();
+    return trackRequest(services.getSprintRepository().getByProject(projectId));
   },
 
-  /**
-   * Update sprint
-   */
   update: async (id: string, data: Partial<Sprint>): Promise<Sprint> => {
-    const response = await apiClient.patch<Sprint>(`/api/sprints/${id}`, data);
-    return transformDates(response.data);
+    const services = getServiceContainer();
+    return trackRequest(services.getSprintRepository().update(id, data));
+  },
+
+  create: async (data: CreateSprintInput): Promise<Sprint> => {
+    const services = getServiceContainer();
+    return trackRequest(services.getSprintRepository().create(data));
   },
 };
 
-// Export configured client for custom requests
-export default apiClient;
+// Auth API
+export const authApi = {
+  login: async (email: string, phoneNumber: string): Promise<{ user: User, token: string }> => {
+    return trackRequest((async () => {
+      const services = getServiceContainer();
+      const userRepo = services.getUserRepository();
+      
+      const user = await userRepo.getByEmail(email);
+
+      if (!user) {
+        throw new Error('Invalid credentials');
+      }
+
+      // Check phone number (acting as password)
+      if (user.phoneNumber !== phoneNumber) {
+        throw new Error('Invalid credentials');
+      }
+
+      // Generate a simple token (base64 of user ID + timestamp)
+      const token = btoa(`${user.id}:${Date.now()}`);
+
+      return { user, token };
+    })());
+  }
+};
+
+export default {
+  bug: bugApi,
+  comment: commentApi,
+  project: projectApi,
+  user: userApi,
+  activityLog: activityLogApi,
+  sprint: sprintApi,
+  auth: authApi,
+};

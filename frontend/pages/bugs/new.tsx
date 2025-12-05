@@ -34,7 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { bugApi, sprintApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
+import { bugApi, sprintApi, handleApiError } from "@/utils/apiClient";
 import { BugPriority, BugSeverity } from "@/utils/types";
 import { Sprint } from "@/lib/models/sprint";
 import { BugTag, BugType } from "@/lib/models/bug";
@@ -44,7 +44,7 @@ import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { useToast } from "@/contexts/ToastContext";
-import { AxiosError } from "axios";
+import { LoadingState } from "@/components/LoadingState";
 
 interface BugFormData {
   title: string;
@@ -180,7 +180,7 @@ export default function NewBugPage() {
       router.push(`/bugs/${newBug.id}`);
     } catch (err) {
       console.error("Failed to create bug:", err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);

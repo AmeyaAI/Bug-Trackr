@@ -375,7 +375,7 @@ export default function SprintBoardPage() {
                             onAssign={handleAssign}
                             onUpdateTags={handleUpdateTags}
                             onValidate={handleValidate}
-                            onViewDetails={() => router.push(`/projects/${projectId}?bugId=${bug.id}`)}
+                            onViewDetails={() => window.open(`/bugs/${bug.id}`, '_blank')}
                           />
                         </KanbanCard>
                       );

@@ -62,6 +62,17 @@ function transformProjectFromStorage(project: Record<string, unknown>): Project 
     return val;
   };
 
+  // Helper to parse date from string, number, or Date
+  const parseDate = (val: unknown): Date => {
+    if (!val) return new Date();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? new Date() : d;
+    }
+    return new Date();
+  };
+
   const id = (project.id || project._id || project.__auto_id__) as string;
   const name = (project.name || '') as string;
   const description = (project.description || '') as string;
@@ -69,11 +80,15 @@ function transformProjectFromStorage(project: Record<string, unknown>): Project 
   const createdByRaw = project.createdBy || project.created_by;
   const createdBy = extractSingle(createdByRaw) as string;
 
+  const createdAtRaw = project.createdAt || project.created_at || project.created;
+  const createdAt = parseDate(createdAtRaw);
+
   return {
     id,
     name,
     description,
     createdBy,
+    createdAt,
   };
 }
 
@@ -92,7 +107,12 @@ export class ProjectRepository {
   async create(projectData: CreateProjectInput): Promise<Project> {
     logger.debug('Creating project', { name: projectData.name });
 
-    const storageData = transformProjectForStorage(projectData);
+    const projectToCreate = {
+      ...projectData,
+      createdAt: new Date(),
+    };
+
+    const storageData = transformProjectForStorage(projectToCreate);
 
     const createdProject = await this.collectionDb.createItem<Record<string, unknown>>(
       COLLECTION_PLURAL,

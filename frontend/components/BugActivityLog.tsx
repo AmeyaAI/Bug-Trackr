@@ -115,8 +115,8 @@ export const BugActivityLog: React.FC<BugActivityLogProps> = ({ bugId, isOpen, o
     }
   };
 
-  const formatTimestamp = (timestamp: string): string => {
-    const date = new Date(timestamp);
+  const formatTimestamp = (timestamp: string | Date): string => {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',

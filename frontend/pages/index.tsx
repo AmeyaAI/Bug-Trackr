@@ -156,7 +156,7 @@ export default function Home() {
                 <Card 
                   key={bug.id} 
                   className="hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => router.push(`/bugs/${bug.id}`)}
+                  onClick={() => window.open(`/bugs/${bug.id}`, '_blank')}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
@@ -198,7 +198,7 @@ export default function Home() {
         <div>
           <h2 className="text-2xl font-semibold mb-4">Quick Actions</h2>
           <div className="grid gap-6 md:grid-cols-3">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/bugs/new')}>
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.open('/bugs/new', '_blank')}>
               <CardHeader>
                 <CardTitle>Create Bug</CardTitle>
                 <CardDescription>

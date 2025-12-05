@@ -172,8 +172,8 @@ const ActivityLogsPage: React.FC = () => {
     }
   };
 
-  const formatTimestamp = (timestamp: string): string => {
-    const date = new Date(timestamp);
+  const formatTimestamp = (timestamp: string | Date): string => {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     

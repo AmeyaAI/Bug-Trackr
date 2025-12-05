@@ -164,6 +164,13 @@ npm run test:ui
 4. Add environment variables
 5. Deploy
 
+### AWS S3 (Static)
+
+1. Configure `output: 'export'` in `next.config.js`
+2. Build: `npm run build`
+3. Sync `out/` folder to S3 bucket
+4. *Note: API routes will not function in this mode*
+
 ### Self-Hosted
 
 1. Build the application: `npm run build`

@@ -18,11 +18,10 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { projectApi, handleApiError, ApiErrorResponse } from "@/utils/apiClient";
+import { projectApi, handleApiError } from "@/utils/apiClient";
 import { useUser } from "@/contexts/UserContext";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { useToast } from "@/contexts/ToastContext";
-import { AxiosError } from "axios";
 
 interface ProjectFormData {
   name: string;
@@ -69,7 +68,7 @@ export default function NewProjectPage() {
       router.push(`/projects/${newProject.id}`);
     } catch (err) {
       console.error("Failed to create project:", err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);

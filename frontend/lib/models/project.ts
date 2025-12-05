@@ -7,7 +7,8 @@ export interface Project {
   name: string;
   description: string;
   readonly createdBy: string;  // User ID (relation to User.id) - immutable after creation
+  readonly createdAt: Date;
 }
 
-export type CreateProjectInput = Omit<Project, 'id'>;
+export type CreateProjectInput = Omit<Project, 'id' | 'createdAt'>;
 export type UpdateProjectInput = Partial<Omit<Project, 'id' | 'createdBy'>>;

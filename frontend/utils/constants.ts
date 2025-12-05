@@ -13,6 +13,7 @@ export const BADGE_VARIANTS = {
   STATUS: {
     Open: 'destructive' as const,
     'In Progress': 'default' as const,
+    'In Review': 'secondary' as const,
     Resolved: 'secondary' as const,
     Closed: 'outline' as const,
   },

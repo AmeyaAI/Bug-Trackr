@@ -11,6 +11,7 @@ export type { BugType };
 export enum BugStatus {
   OPEN = "Open",
   IN_PROGRESS = "In Progress",
+  IN_REVIEW = "In Review",
   RESOLVED = "Resolved",
   CLOSED = "Closed",
 }
@@ -59,8 +60,8 @@ export interface Bug {
   type: BugType;
   tags: BugTag[];
   validated: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Comment {
@@ -68,7 +69,7 @@ export interface Comment {
   bugId: string;
   authorId: string;
   message: string;
-  createdAt: string;
+  createdAt: Date;
 }
 
 export interface Project {
@@ -76,7 +77,7 @@ export interface Project {
   name: string;
   description: string;
   createdBy: string;
-  createdAt?: string;
+  createdAt?: Date;
 }
 
 export interface User {
@@ -84,8 +85,8 @@ export interface User {
   name: string;
   email: string;
   role: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface ActivityLog {
@@ -99,7 +100,7 @@ export interface ActivityLog {
   performedByName: string;
   assignedToName?: string;  // For "assigned" action - name of user who was assigned
   newStatus?: string;  // For "status_changed" action - the new status value
-  timestamp: string;
+  timestamp: Date;
 }
 
 // API Request types
@@ -145,7 +146,7 @@ export interface BugResponse {
   description: string;
   projectId: string;
   reportedBy: string;
-  assignedTo?: string;
+  assignedTo?: string | null;
   sprintId?: string | null;
   status: BugStatus;
   priority: BugPriority;
@@ -153,8 +154,8 @@ export interface BugResponse {
   type: BugType;
   tags: BugTag[];
   validated: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CommentResponse {
@@ -162,7 +163,7 @@ export interface CommentResponse {
   bugId: string;
   authorId: string;
   message: string;
-  createdAt: string;
+  createdAt: Date;
 }
 
 export interface ProjectResponse {
@@ -170,7 +171,7 @@ export interface ProjectResponse {
   name: string;
   description: string;
   createdBy: string;
-  createdAt: string;
+  createdAt: Date;
 }
 
 export interface BugWithCommentsResponse {

@@ -32,7 +32,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CommentSection } from '@/components/CommentSection';
-import { bugApi, commentApi, handleApiError, ApiErrorResponse } from '@/utils/apiClient';
+import { bugApi, commentApi, handleApiError } from '@/utils/apiClient';
 import { Bug, Comment, BugStatus, UserRole, getRolePermissions } from '@/utils/types';
 import { getUserName as getNameFromUsers, getStatusBadgeVariant } from '@/utils/badgeHelpers';
 import { useUser } from '@/contexts/UserContext';
@@ -40,7 +40,6 @@ import { useUsers, useProjects, useSprints } from '@/lib/hooks/useData';
 import { useToast } from '@/contexts/ToastContext';
 import { LoadingState } from '@/components/LoadingState';
 import { handleEventualConsistency } from '@/utils/apiHelpers';
-import { AxiosError } from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BugActivityLog } from '@/components/BugActivityLog';
@@ -94,7 +93,7 @@ export default function BugDetailsPage() {
       
     } catch (err) {
       console.error('Failed to load bug details:', err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       setLoadError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -123,7 +122,7 @@ export default function BugDetailsPage() {
       bugId,
       authorId: currentUser.id,
       message,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     };
 
     // Update UI immediately
@@ -145,7 +144,7 @@ export default function BugDetailsPage() {
     } catch (err) {
       // Revert optimistic update on error
       setComments(prev => prev.filter(c => c.id !== tempId));
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
       throw err;
     }
@@ -163,7 +162,7 @@ export default function BugDetailsPage() {
       toast.success('Bug validated successfully');
     } catch (err) {
       console.error('Failed to validate bug:', err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -191,7 +190,7 @@ export default function BugDetailsPage() {
       toast.success('Bug closed successfully');
     } catch (err) {
       console.error('Failed to close bug:', err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -215,7 +214,7 @@ export default function BugDetailsPage() {
       setSelectedAssignee('');
     } catch (err) {
       console.error('Failed to assign bug:', err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -240,7 +239,7 @@ export default function BugDetailsPage() {
       setSelectedStatus(null);
     } catch (err) {
       console.error('Failed to update status:', err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -261,7 +260,7 @@ export default function BugDetailsPage() {
       setShowSprintDialog(false);
     } catch (err) {
       console.error('Failed to move bug to sprint:', err);
-      const errorMessage = handleApiError(err as AxiosError<ApiErrorResponse>);
+      const errorMessage = handleApiError(err);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);

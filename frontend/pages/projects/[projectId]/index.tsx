@@ -193,12 +193,12 @@ export default function ProjectBugsPage() {
   }, [loadData]);
 
   const handleViewDetails = (bugId: string) => {
-    router.push(`/bugs/${bugId}`);
+    window.open(`/bugs/${bugId}`, '_blank');
   };
 
   const handleCreateBug = () => {
     // Navigate to bug creation with project pre-selected
-    router.push(`/bugs/new?projectId=${projectId}`);
+    window.open(`/bugs/new?projectId=${projectId}`, '_blank');
   };
 
   const handleBackToProjects = () => {

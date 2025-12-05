@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/contexts/ToastContext';
 import { LogoIcon } from '@/components/AppSidebar';
 import dpodLogo from '@/assets/dpod.png';
+import { getServiceContainer } from '@/lib/services/serviceContainer';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -23,23 +24,31 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, phoneNumber }),
-      });
+      // Client-side authentication using Repository pattern
+      const services = getServiceContainer();
+      const userRepo = services.getUserRepository();
+      
+      // 1. Find user by email
+      const user = await userRepo.getByEmail(email);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+      if (!user) {
+        throw new Error('User not found. Please check your email.');
       }
 
+      // 2. Validate phone number (simple check as per previous implementation)
+      // Note: In a real app, we would hash this or use a proper auth provider.
+      // Here we compare the raw strings as stored in the DB.
+      if (user.phoneNumber !== phoneNumber) {
+        throw new Error('Invalid phone number.');
+      }
+
+      // 3. Login successful
+      // Generate a mock token for compatibility with existing code that expects it
+      const token = `mock-jwt-token-${user.id}-${Date.now()}`;
+      
       // Save token and user
-      localStorage.setItem('bugtrackr_token', data.token);
-      setCurrentUser(data.user);
+      localStorage.setItem('bugtrackr_token', token);
+      setCurrentUser(user);
       
       showToast('success', 'Logged in successfully');
       router.push('/');

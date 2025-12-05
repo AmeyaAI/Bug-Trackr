@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/contexts/ToastContext';
-import apiClient from '@/utils/apiClient';
+import { sprintApi } from '@/utils/apiClient';
 
 interface CreateSprintDialogProps {
   projectId: string;
@@ -95,7 +95,7 @@ export function CreateSprintDialog({ projectId, onSprintCreated }: CreateSprintD
         return;
       }
 
-      await apiClient.post('/api/sprints', {
+      await sprintApi.create({
         projectId,
         name: formData.name,
         startDate: new Date(formData.startDate),

@@ -9,7 +9,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 // Base URL usually ends with .../dpdo_bug_tracker
 // We need to handle if the env var already includes the collection name or not.
 // Based on .env.local it ends with dpdo_bug_tracker.
-let BASE_COLLECTION_URL = process.env.APPFLYTE_COLLECTION_BASE_URL || 'https://appflyte-backend.ameya.ai/0aee6bd7-ed42-4184-9bac-ce0466737ada/api/collection/0aee6bd7-ed42-4184-9bac-ce0466737ada/user/public/cm/0/dpdo_bug_tracker';
+let BASE_COLLECTION_URL = process.env.APPFLYTE_COLLECTION_BASE_URL || process.env.NEXT_PUBLIC_APPFLYTE_COLLECTION_BASE_URL || 'https://appflyte-backend.ameya.ai/0aee6bd7-ed42-4184-9bac-ce0466737ada/api/collection/0aee6bd7-ed42-4184-9bac-ce0466737ada/user/public/cm/0/dpdo_bug_tracker';
 
 // Remove trailing slash if present
 if (BASE_COLLECTION_URL.endsWith('/')) {
@@ -24,10 +24,10 @@ if (BASE_COLLECTION_URL.endsWith('/bug_tracking_bugs')) {
 const FETCH_URL = `${BASE_COLLECTION_URL}/bug_tracking_bugss`;
 const DELETE_URL_PREFIX = `${BASE_COLLECTION_URL}/bug_tracking_bugs`;
 
-const TOKEN = process.env.APPFLYTE_COLLECTION_API_KEY ? `Bearer ${process.env.APPFLYTE_COLLECTION_API_KEY}` : process.env.AUTH_TOKEN;
+const TOKEN = process.env.APPFLYTE_COLLECTION_API_KEY || process.env.NEXT_PUBLIC_APPFLYTE_COLLECTION_API_KEY || process.env.AUTH_TOKEN;
 
 if (!TOKEN) {
-  console.error('Error: No authentication token found. Please set APPFLYTE_COLLECTION_API_KEY in .env.local or AUTH_TOKEN env var.');
+  console.error('Error: No authentication token found. Please set NEXT_PUBLIC_APPFLYTE_COLLECTION_API_KEY in .env.local.');
   process.exit(1);
 }
 

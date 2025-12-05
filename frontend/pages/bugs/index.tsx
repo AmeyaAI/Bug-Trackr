@@ -199,11 +199,11 @@ export default function BugsPage() {
   }, [loadData]);
 
   const handleViewDetails = (bugId: string) => {
-    router.push(`/bugs/${bugId}`);
+    window.open(`/bugs/${bugId}`, '_blank');
   };
 
   const handleCreateBug = () => {
-    router.push('/bugs/new');
+    window.open('/bugs/new', '_blank');
   };
 
   const handleStatusUpdate = async (bugId: string, newStatus: BugStatus) => {
