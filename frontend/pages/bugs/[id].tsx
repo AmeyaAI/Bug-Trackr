@@ -39,7 +39,6 @@ import { useUser } from '@/contexts/UserContext';
 import { useUsers, useProjects, useSprints } from '@/lib/hooks/useData';
 import { useToast } from '@/contexts/ToastContext';
 import { LoadingState } from '@/components/LoadingState';
-import { handleEventualConsistency } from '@/utils/apiHelpers';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { BugActivityLog } from '@/components/BugActivityLog';
@@ -155,10 +154,14 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await handleEventualConsistency(
-        () => bugApi.validate(bug.id, currentUser.id, currentUser.role),
-        () => loadBugDetails(bug.id, false)
-      );
+      const response = await bugApi.validate(bug.id, currentUser.id);
+      
+      if (response.bug) {
+        setBug(response.bug);
+      } else {
+        await loadBugDetails(bug.id, false);
+      }
+      
       toast.success('Bug validated successfully');
     } catch (err) {
       console.error('Failed to validate bug:', err);
@@ -179,14 +182,18 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await handleEventualConsistency(
-        () => bugApi.updateStatus(bug.id, {
-          status: BugStatus.CLOSED,
-          userId: currentUser.id,
-          userRole: currentUser.role as UserRole,
-        }),
-        () => loadBugDetails(bug.id, false)
-      );
+      const response = await bugApi.updateStatus(bug.id, {
+        status: BugStatus.CLOSED,
+        userId: currentUser.id,
+        userRole: currentUser.role as UserRole,
+      });
+      
+      if (response.bug) {
+        setBug(response.bug);
+      } else {
+        await loadBugDetails(bug.id, false);
+      }
+      
       toast.success('Bug closed successfully');
     } catch (err) {
       console.error('Failed to close bug:', err);
@@ -202,13 +209,17 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await handleEventualConsistency(
-        () => bugApi.assign(bug.id, {
-          assignedTo: selectedAssignee,
-          assignedBy: currentUser.id,
-        }),
-        () => loadBugDetails(bug.id, false)
-      );
+      const response = await bugApi.assign(bug.id, {
+        assignedTo: selectedAssignee,
+        assignedBy: currentUser.id,
+      });
+      
+      if (response.bug) {
+        setBug(response.bug);
+      } else {
+        await loadBugDetails(bug.id, false);
+      }
+      
       toast.success('Bug assigned successfully');
       setShowAssignDialog(false);
       setSelectedAssignee('');
@@ -226,14 +237,18 @@ export default function BugDetailsPage() {
     
     setIsSubmitting(true);
     try {
-      await handleEventualConsistency(
-        () => bugApi.updateStatus(bug.id, {
-          status: selectedStatus,
-          userId: currentUser.id,
-          userRole: currentUser.role as UserRole,
-        }),
-        () => loadBugDetails(bug.id, false)
-      );
+      const response = await bugApi.updateStatus(bug.id, {
+        status: selectedStatus,
+        userId: currentUser.id,
+        userRole: currentUser.role as UserRole,
+      });
+      
+      if (response.bug) {
+        setBug(response.bug);
+      } else {
+        await loadBugDetails(bug.id, false);
+      }
+      
       toast.success('Bug status updated successfully');
       setShowStatusDialog(false);
       setSelectedStatus(null);
@@ -252,10 +267,10 @@ export default function BugDetailsPage() {
     setIsSubmitting(true);
     try {
       const sprintIdToUpdate = selectedSprint === 'backlog' ? null : selectedSprint;
-      await handleEventualConsistency(
-        () => bugApi.updateSprint(bug.id, sprintIdToUpdate, currentUser.role),
-        () => loadBugDetails(bug.id, false)
-      );
+      const updatedBug = await bugApi.updateSprint(bug.id, sprintIdToUpdate);
+      
+      setBug(updatedBug);
+      
       toast.success('Bug moved to sprint successfully');
       setShowSprintDialog(false);
     } catch (err) {
@@ -294,7 +309,7 @@ export default function BugDetailsPage() {
 
   return (
     <div className="flex flex-col bg-background p-6">
-      <div className="flex-1 max-w-7xl mx-auto space-y-6">
+      <div className="flex-1 w-full space-y-6">
         {/* Header with back button and actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <Button variant="ghost" onClick={() => router.push('/bugs')} className="w-fit pl-0 hover:pl-2 transition-all">

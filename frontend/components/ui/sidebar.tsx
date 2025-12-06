@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 import React, { useState, createContext, useContext } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { IconMenu2, IconX } from "@tabler/icons-react";
+import Link from "next/link";
+import { useRouter } from "next/router";
 
 interface Links {
   label: string;
@@ -88,11 +90,13 @@ export const DesktopSidebar = ({
     <>
       <motion.div
         className={cn(
-          "h-full px-4 py-4 hidden  md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] shrink-0",
+          "h-full py-4 hidden  md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] shrink-0",
           className
         )}
         animate={{
           width: animate ? (open ? "300px" : "60px") : "300px",
+          paddingLeft: animate ? (open ? "16px" : "8px") : "16px",
+          paddingRight: animate ? (open ? "16px" : "8px") : "16px",
         }}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
@@ -164,26 +168,40 @@ export const SidebarLink = ({
   props?: React.HTMLAttributes<HTMLAnchorElement>;
 }) => {
   const { open, animate } = useSidebar();
+  const router = useRouter();
+  // Simple active check: exact match or starts with (for subpages)
+  // For home '/', exact match only to avoid matching everything
+  const isActive = link.href === '/' 
+    ? router.pathname === '/' 
+    : router.pathname.startsWith(link.href);
+
   return (
-    <a
+    <Link
       href={link.href}
       className={cn(
-        "flex items-center justify-start gap-2  group/sidebar py-2",
+        "flex items-center justify-start gap-2 group/sidebar py-2 px-2 rounded-md transition-colors",
+        !open ? "justify-center" : "",
+        isActive ? "bg-cyan-50 dark:bg-cyan-900/20" : "hover:bg-neutral-200 dark:hover:bg-neutral-700",
         className
       )}
       {...props}
     >
-      {link.icon}
+      <div className={cn(isActive ? "text-cyan-600 dark:text-cyan-400" : "text-neutral-700 dark:text-neutral-200")}>
+        {link.icon}
+      </div>
 
       <motion.span
         animate={{
           display: animate ? (open ? "inline-block" : "none") : "inline-block",
           opacity: animate ? (open ? 1 : 0) : 1,
         }}
-        className="text-neutral-700 dark:text-neutral-200 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
+        className={cn(
+            "text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0",
+            isActive ? "text-cyan-600 dark:text-cyan-400 font-medium" : "text-neutral-700 dark:text-neutral-200"
+        )}
       >
         {link.label}
       </motion.span>
-    </a>
+    </Link>
   );
 };

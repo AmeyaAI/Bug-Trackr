@@ -112,7 +112,7 @@ export default function SprintBoardPage() {
   const handleValidate = async (bugId: string) => {
     try {
       if (currentUser) {
-        await bugApi.validate(bugId, currentUser.id, currentUser.role);
+        await bugApi.validate(bugId, currentUser.id);
         mutate();
       }
     } catch (err) {
@@ -222,7 +222,7 @@ export default function SprintBoardPage() {
 
       try {
         // Validate first
-        await bugApi.validate(bugId, currentUser.id, currentUser.role);
+        await bugApi.validate(bugId, currentUser.id);
         // Then update status to CLOSED
         await bugApi.updateStatus(bugId, {
           status: BugStatus.CLOSED,

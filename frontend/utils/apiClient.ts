@@ -5,8 +5,8 @@
 
 import { getServiceContainer } from '../lib/services/serviceContainer';
 import { Sprint, CreateSprintInput } from '../lib/models/sprint';
-import { BugTag, BugStatus } from '../lib/models/bug';
-import { Activity } from '../lib/models/activity';
+import { BugTag, BugStatus, BugPriority, BugSeverity, BugType } from '../lib/models/bug';
+import { Activity, ActivityAction } from '../lib/models/activity';
 import type {
   Bug,
   Comment,
@@ -79,8 +79,8 @@ const enrichActivity = async (activity: Activity): Promise<ActivityLog> => {
   const services = getServiceContainer();
   
   const [bug, user] = await Promise.all([
-    services.getBugRepository().getById(activity.bugId),
-    services.getUserRepository().getById(activity.authorId)
+    activity.bugId ? services.getBugRepository().getById(activity.bugId) : Promise.resolve(null),
+    activity.authorId ? services.getUserRepository().getById(activity.authorId) : Promise.resolve(null)
   ]);
 
   let project = null;
@@ -88,15 +88,23 @@ const enrichActivity = async (activity: Activity): Promise<ActivityLog> => {
     project = await services.getProjectRepository().getById(bug.projectId);
   }
 
+  let assignedToName: string | undefined;
+  if (activity.assignedToId) {
+    const assignedUser = await services.getUserRepository().getById(activity.assignedToId);
+    assignedToName = assignedUser?.name;
+  }
+
   return {
     id: activity.id,
-    bugId: activity.bugId,
+    bugId: activity.bugId || '',
     bugTitle: bug?.title || 'Unknown Bug',
     projectId: project?.id || 'unknown',
     projectName: project?.name || 'Unknown Project',
     action: activity.action,
     performedBy: activity.authorId,
     performedByName: user?.name || 'Unknown User',
+    newStatus: activity.newStatus,
+    assignedToName,
     timestamp: activity.timestamp,
   };
 };
@@ -128,10 +136,13 @@ export const bugApi = {
     if (filters) {
         return trackRequest(repo.search({
             projectId: filters.projectId,
-            status: filters.status as any,
+            status: filters.status as BugStatus,
             assignedTo: filters.assignedTo,
-            priority: filters.priority as any,
-            searchQuery: filters.search
+            priority: filters.priority as BugPriority,
+            severity: filters.severity as BugSeverity,
+            type: filters.type as BugType,
+            searchQuery: filters.search,
+            sprintId: filters.sprintId
         }, pageSize, lastEvaluatedKey));
     }
 
@@ -168,29 +179,63 @@ export const bugApi = {
         attachments: ''
     };
     const bug = await trackRequest(services.getBugRepository().create(createInput));
+
+    // Log activity
+    await services.getActivityRepository().create({
+      bugId: bug.id,
+      action: ActivityAction.REPORTED,
+      authorId: data.reportedBy,
+    });
+
     return bug;
   },
 
   updateStatus: async (id: string, data: BugStatusUpdateRequest): Promise<StatusUpdateResponse> => {
     const services = getServiceContainer();
     const bug = await trackRequest(services.getBugRepository().updateStatus(id, data.status as BugStatus));
+
+    // Log activity
+    await services.getActivityRepository().create({
+      bugId: id,
+      action: ActivityAction.STATUS_CHANGED,
+      authorId: data.userId,
+      newStatus: data.status,
+    });
+
     return { success: true, bug, message: 'Status updated' };
   },
 
-  validate: async (id: string, userId: string, _userRole: string = 'tester'): Promise<StatusUpdateResponse> => {
+  validate: async (id: string, userId: string): Promise<StatusUpdateResponse> => {
     const services = getServiceContainer();
     const bugRepo = services.getBugRepository();
     const bug = await trackRequest(bugRepo.update(id, { validated: true }));
+
+    // Log activity
+    await services.getActivityRepository().create({
+      bugId: id,
+      action: ActivityAction.VALIDATED,
+      authorId: userId,
+    });
+
     return { success: true, bug, message: 'Validated' };
   },
 
   assign: async (id: string, data: BugAssignRequest): Promise<AssignmentResponse> => {
     const services = getServiceContainer();
     const bug = await trackRequest(services.getBugRepository().updateAssignment(id, data.assignedTo));
+
+    // Log activity
+    await services.getActivityRepository().create({
+      bugId: id,
+      action: ActivityAction.ASSIGNED,
+      authorId: data.assignedBy,
+      assignedToId: data.assignedTo,
+    });
+
     return { success: true, bug, message: 'Assigned' };
   },
 
-  updateSprint: async (id: string, sprintId: string | null, _userRole: string): Promise<BugResponse> => {
+  updateSprint: async (id: string, sprintId: string | null): Promise<BugResponse> => {
     const services = getServiceContainer();
     const bug = await trackRequest(services.getBugRepository().update(id, { sprintId }));
     return bug;
@@ -208,6 +253,14 @@ export const commentApi = {
   create: async (data: CommentCreateRequest): Promise<CommentResponse> => {
     const services = getServiceContainer();
     const comment = await trackRequest(services.getCommentRepository().create(data));
+
+    // Log activity
+    await services.getActivityRepository().create({
+      bugId: data.bugId,
+      action: ActivityAction.COMMENTED,
+      authorId: data.authorId,
+    });
+
     return comment;
   },
 
@@ -266,6 +319,12 @@ export const activityLogApi = {
     const activities = await trackRequest(services.getActivityRepository().getByBug(bugId));
     return Promise.all(activities.map(enrichActivity));
   },
+
+  getRecent: async (limit: number = 10): Promise<ActivityLog[]> => {
+    const services = getServiceContainer();
+    const activities = await trackRequest(services.getActivityRepository().getRecent(limit));
+    return Promise.all(activities.map(enrichActivity));
+  },
 };
 
 // Sprint API endpoints
@@ -317,7 +376,7 @@ export const authApi = {
   }
 };
 
-export default {
+const apiClient = {
   bug: bugApi,
   comment: commentApi,
   project: projectApi,
@@ -326,3 +385,5 @@ export default {
   sprint: sprintApi,
   auth: authApi,
 };
+
+export default apiClient;

@@ -26,7 +26,7 @@ const COLLECTION_SINGULAR = 'bug_tracking_activities';
  * Ensures relational fields are stored as arrays
  */
 function transformActivityForStorage(activity: Partial<Activity>): Record<string, unknown> {
-  const { bugId, authorId, ...rest } = activity;
+  const { bugId, authorId, assignedToId, ...rest } = activity;
   
   const storageData: Record<string, unknown> = { ...rest };
 
@@ -36,6 +36,10 @@ function transformActivityForStorage(activity: Partial<Activity>): Record<string
 
   if (authorId !== undefined) {
     storageData.authorId = [authorId];
+  }
+
+  if (assignedToId !== undefined) {
+    storageData.assignedToId = [assignedToId];
   }
 
   return storageData;
@@ -82,9 +86,13 @@ function transformActivityFromStorage(activity: Record<string, unknown>): Activi
   
   const bugIdRaw = activity.bugId || activity.bug_id;
   const authorIdRaw = activity.authorId || activity.author_id;
+  const assignedToIdRaw = activity.assignedToId || activity.assigned_to_id;
   
   const bugId = extractSingle(bugIdRaw) as string;
   const authorId = extractSingle(authorIdRaw) as string;
+  const assignedToId = extractSingle(assignedToIdRaw) as string | undefined;
+  
+  const newStatus = (activity.newStatus || activity.new_status) as string | undefined;
   
   const timestampRaw = activity.timestamp || activity.created_at || activity.created;
   const timestamp = parseDate(timestampRaw);
@@ -94,6 +102,8 @@ function transformActivityFromStorage(activity: Record<string, unknown>): Activi
     bugId,
     action,
     authorId,
+    newStatus,
+    assignedToId,
     timestamp,
   };
 }
@@ -207,6 +217,9 @@ export class ActivityRepository {
     );
 
     const transformedActivities = activities.map(transformActivityFromStorage);
+    
+    // Sort by timestamp descending
+    transformedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     
     logger.info('Activities fetched by bug successfully', { bugId, count: transformedActivities.length });
     return transformedActivities;

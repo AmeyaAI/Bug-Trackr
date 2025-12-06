@@ -48,21 +48,31 @@ export const BugActivityLog: React.FC<BugActivityLogProps> = ({ bugId, isOpen, o
     }
   }, [isOpen, bugId]);
 
-  // Group logs by date (reused logic)
+  // Group logs by date
   const groupedLogs = useMemo(() => {
+    // Sort logs by timestamp descending first to ensure correct order within groups
+    const sortedLogs = [...activityLogs].sort((a, b) => {
+      const dateA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      const dateB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+      return dateB.getTime() - dateA.getTime();
+    });
+
     const groups: GroupedLogs = {};
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
     
-    activityLogs.forEach((log) => {
-      const logDate = new Date(log.timestamp);
-      const diffDays = Math.floor((now.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24));
+    sortedLogs.forEach((log) => {
+      const logDate = log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp);
+      const logDay = new Date(logDate.getFullYear(), logDate.getMonth(), logDate.getDate());
       
       let groupKey: string;
-      if (diffDays === 0) {
+      if (logDay.getTime() === today.getTime()) {
         groupKey = 'Today';
-      } else if (diffDays === 1) {
+      } else if (logDay.getTime() === yesterday.getTime()) {
         groupKey = 'Yesterday';
-      } else if (diffDays < 7) {
+      } else if (now.getTime() - logDate.getTime() < 7 * 24 * 60 * 60 * 1000) {
         groupKey = logDate.toLocaleDateString('en-US', { weekday: 'long' });
       } else {
         groupKey = logDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -109,7 +119,7 @@ export const BugActivityLog: React.FC<BugActivityLogProps> = ({ bugId, isOpen, o
           </span>
         );
       case 'validated':
-        return <span className="text-sm text-gray-600 dark:text-gray-400">commented</span>;
+        return <span className="text-sm text-gray-600 dark:text-gray-400">validated this ticket</span>;
       default:
         return <span className="text-sm text-gray-600 dark:text-gray-400">performed an action</span>;
     }

@@ -18,6 +18,8 @@ export interface Activity {
   bugId: string;      // Relation to Bug.id
   action: ActivityAction;  // ActivityAction enum for type safety
   authorId: string;   // Relation to User.id
+  newStatus?: string; // For status changes
+  assignedToId?: string; // For assignments
   readonly timestamp: Date;
 }
 
