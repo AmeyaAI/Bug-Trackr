@@ -402,8 +402,8 @@ export class BugRepository {
     // Filter out non-applicable ones and sort by priority
     const activeFilters = allFilters.filter(f => f.isApplicable).sort((a, b) => a.priority - b.priority);
 
-    // Determine split: Max 5 filters to DB to prevent crashes
-    const MAX_DB_FILTERS = 5;
+    // Determine split: Max 2 filters to DB to prevent crashes
+    const MAX_DB_FILTERS = 2;
     const dbFiltersToApply = activeFilters.slice(0, MAX_DB_FILTERS);
     const memFiltersToApply = activeFilters.slice(MAX_DB_FILTERS);
 
