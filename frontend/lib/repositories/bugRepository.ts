@@ -311,79 +311,105 @@ export class BugRepository {
   ): Promise<{ bugs: Bug[], lastEvaluatedKey: Record<string, unknown> | null }> {
     logger.debug('Searching bugs', { filters, pageSize, lastEvaluatedKey });
 
-    const dbFilters: FilterQuery[] = [];
-
-    if (filters.projectId && filters.projectId !== 'all') {
-      dbFilters.push({
-        field_name: 'payload.project_id',
-        field_value: filters.projectId,
-        operator: 'like',
-      });
-    }
-
-    if (filters.sprintId && filters.sprintId !== 'all') {
-      dbFilters.push({
-        field_name: 'payload.sprint_id',
-        field_value: filters.sprintId,
-        operator: 'like',
-      });
-    }
-
-    if (filters.status && (filters.status as string) !== 'all') {
-      dbFilters.push({
-        field_name: 'payload.status',
-        field_value: filters.status,
-        operator: 'eq',
-      });
-    }
-
-    if (filters.assignedTo && filters.assignedTo !== 'all') {
-        if (filters.assignedTo === 'unassigned') {
-            dbFilters.push({
-                field_name: 'payload.assigned_to',
-                field_value: null,
-                operator: 'eq',
-            });
-        } else {
-            dbFilters.push({
-                field_name: 'payload.assigned_to',
-                field_value: filters.assignedTo,
-                operator: 'like',
-            });
+    // Define all potential filters with their DB and Memory logic
+    // Priority: lower is better (more reductive/important)
+    const allFilters: {
+        id: string;
+        priority: number;
+        isApplicable: boolean;
+        addToDb: (arr: FilterQuery[]) => void;
+        applyToMem: (bugs: Bug[]) => Bug[];
+    }[] = [
+        {
+            id: 'projectId',
+            priority: 1,
+            isApplicable: !!filters.projectId && filters.projectId !== 'all',
+            addToDb: (arr) => arr.push({ field_name: 'payload.project_id', field_value: filters.projectId!, operator: 'like' }),
+            applyToMem: (bugs) => bugs.filter(b => b.projectId === filters.projectId)
+        },
+        {
+            id: 'sprintId',
+            priority: 2,
+            isApplicable: !!filters.sprintId && filters.sprintId !== 'all',
+            addToDb: (arr) => {
+                 if (filters.sprintId === 'backlog') {
+                    arr.push({ field_name: 'payload.sprint_id', field_value: [], operator: 'eq' });
+                 } else {
+                    arr.push({ field_name: 'payload.sprint_id', field_value: filters.sprintId!, operator: 'like' });
+                 }
+            },
+            applyToMem: (bugs) => {
+                if (filters.sprintId === 'backlog') return bugs.filter(b => !b.sprintId);
+                return bugs.filter(b => b.sprintId === filters.sprintId);
+            }
+        },
+        {
+            id: 'searchQuery',
+            priority: 3,
+            isApplicable: !!filters.searchQuery,
+            addToDb: (arr) => arr.push({ field_name: 'payload.title', field_value: filters.searchQuery!, operator: 'like' }),
+            applyToMem: (bugs) => {
+                const q = filters.searchQuery!.toLowerCase();
+                return bugs.filter(b => b.title.toLowerCase().includes(q));
+            }
+        },
+        {
+            id: 'assignedTo',
+            priority: 4,
+            isApplicable: !!filters.assignedTo && filters.assignedTo !== 'all',
+            addToDb: (arr) => {
+                if (filters.assignedTo === 'unassigned') {
+                    arr.push({ field_name: 'payload.assigned_to', field_value: null, operator: 'eq' });
+                } else {
+                    arr.push({ field_name: 'payload.assigned_to', field_value: filters.assignedTo!, operator: 'eq' });
+                }
+            },
+            applyToMem: (bugs) => {
+                if (filters.assignedTo === 'unassigned') return bugs.filter(b => !b.assignedTo);
+                return bugs.filter(b => b.assignedTo === filters.assignedTo);
+            }
+        },
+        {
+            id: 'status',
+            priority: 5,
+            isApplicable: !!filters.status && (filters.status as string) !== 'all',
+            addToDb: (arr) => arr.push({ field_name: 'payload.status', field_value: filters.status!, operator: 'eq' }),
+            applyToMem: (bugs) => bugs.filter(b => b.status === filters.status)
+        },
+        {
+            id: 'type',
+            priority: 6,
+            isApplicable: !!filters.type && (filters.type as string) !== 'all',
+            addToDb: (arr) => arr.push({ field_name: 'payload.type', field_value: filters.type!, operator: 'eq' }),
+            applyToMem: (bugs) => bugs.filter(b => b.type === filters.type)
+        },
+        {
+            id: 'priority',
+            priority: 7,
+            isApplicable: !!filters.priority && (filters.priority as string) !== 'all',
+            addToDb: (arr) => arr.push({ field_name: 'payload.priority', field_value: filters.priority!, operator: 'eq' }),
+            applyToMem: (bugs) => bugs.filter(b => b.priority === filters.priority)
+        },
+        {
+            id: 'severity',
+            priority: 8,
+            isApplicable: !!filters.severity && (filters.severity as string) !== 'all',
+            addToDb: (arr) => arr.push({ field_name: 'payload.severity', field_value: filters.severity!, operator: 'eq' }),
+            applyToMem: (bugs) => bugs.filter(b => b.severity === filters.severity)
         }
-    }
+    ];
 
-    if (filters.priority && (filters.priority as string) !== 'all') {
-      dbFilters.push({
-        field_name: 'payload.priority',
-        field_value: filters.priority,
-        operator: 'eq',
-      });
-    }
+    // Filter out non-applicable ones and sort by priority
+    const activeFilters = allFilters.filter(f => f.isApplicable).sort((a, b) => a.priority - b.priority);
 
-    if (filters.severity && (filters.severity as string) !== 'all') {
-      dbFilters.push({
-        field_name: 'payload.severity',
-        field_value: filters.severity,
-        operator: 'eq',
-      });
-    }
+    // Determine split: Max 5 filters to DB to prevent crashes
+    const MAX_DB_FILTERS = 5;
+    const dbFiltersToApply = activeFilters.slice(0, MAX_DB_FILTERS);
+    const memFiltersToApply = activeFilters.slice(MAX_DB_FILTERS);
 
-    if (filters.type && (filters.type as string) !== 'all') {
-      dbFilters.push({
-        field_name: 'payload.type',
-        field_value: filters.type,
-        operator: 'eq',
-      });
-    }
-
-    if (filters.searchQuery) {
-      dbFilters.push({
-        field_name: 'payload.title',
-        field_value: filters.searchQuery,
-        operator: 'like',
-      });
-    }
+    // Construct DB Query
+    const dbFilters: FilterQuery[] = [];
+    dbFiltersToApply.forEach(f => f.addToDb(dbFilters));
 
     const result = await this.collectionDb.queryItemsPaginated<Record<string, unknown>>(
       COLLECTION_PLURAL,
@@ -396,9 +422,19 @@ export class BugRepository {
     );
 
     // Transform tags string to array for each bug
-    const transformedBugs = result.items.map(transformBugFromStorage);
+    let transformedBugs = result.items.map(transformBugFromStorage);
 
-    logger.info('Bugs searched successfully', { count: transformedBugs.length });
+    // Apply In-Memory Filters
+    memFiltersToApply.forEach(f => {
+        transformedBugs = f.applyToMem(transformedBugs);
+    });
+
+    logger.info('Bugs searched successfully', { 
+        count: transformedBugs.length, 
+        dbFilters: dbFiltersToApply.map(f => f.id),
+        memFilters: memFiltersToApply.map(f => f.id)
+    });
+
     return {
       bugs: transformedBugs,
       lastEvaluatedKey: result.lastEvaluatedKey

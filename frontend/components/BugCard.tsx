@@ -26,7 +26,7 @@ import { PriorityIcon } from "@/components/PriorityIcon";
 import { SeverityIcon } from "@/components/SeverityIcon";
 import { TagBadge } from "@/components/TagBadge";
 import { getBugTypeBorderClass } from "@/utils/badgeHelpers";
-import { User as UserIcon, MoreHorizontal, CheckCircle2, UserPlus, Tag, ArrowRightCircle } from "lucide-react";
+import { User as UserIcon, MoreHorizontal, CheckCircle2, UserPlus, Tag, ArrowRightCircle, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +45,7 @@ interface BugCardProps {
   assignedUserName?: string;
   users?: User[];
   onStatusUpdate?: (bugId: string, newStatus: BugStatus) => void;
-  onAssign?: (bugId: string, userId: string) => void;
+  onAssign?: (bugId: string, userId: string) => Promise<void> | void;
   onUpdateTags?: (bugId: string, tags: BugTag[]) => void;
   onValidate?: (bugId: string) => void;
   onViewDetails?: (bugId: string) => void;
@@ -64,6 +64,7 @@ export const BugCard: React.FC<BugCardProps> = ({
   const canUpdateStatus = usePermission('canUpdateStatus');
   const canValidateBug = usePermission('canValidateBug');
   const canAssignBug = usePermission('canAssignBug');
+  const [isAssigning, setIsAssigning] = React.useState(false);
 
   const handleStatusChange = (newStatus: BugStatus) => {
     if (onStatusUpdate) {
@@ -71,9 +72,14 @@ export const BugCard: React.FC<BugCardProps> = ({
     }
   };
 
-  const handleAssignUser = (userId: string) => {
+  const handleAssignUser = async (userId: string) => {
     if (onAssign) {
-      onAssign(bug.id, userId);
+      setIsAssigning(true);
+      try {
+        await onAssign(bug.id, userId);
+      } finally {
+        setIsAssigning(false);
+      }
     }
   };
 
@@ -244,7 +250,9 @@ export const BugCard: React.FC<BugCardProps> = ({
           </div>
 
           <div className="flex items-center gap-2" title={assignedUserName ? `Assigned to ${assignedUserName}` : "Unassigned"}>
-             {bug.assignedTo && assignedUserName ? (
+             {isAssigning ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+             ) : bug.assignedTo && assignedUserName ? (
                 <Avatar className="h-5 w-5">
                   <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                     {getInitials(assignedUserName)}

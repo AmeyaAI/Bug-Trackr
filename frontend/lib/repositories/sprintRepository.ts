@@ -10,6 +10,14 @@ const COLLECTION_SINGULAR = 'bug_tracking_sprints';
  * Transforms sprint data from Collection DB
  */
 function transformSprintFromStorage(sprint: Record<string, unknown>): Sprint {
+  // Helper to extract single value from array or value
+  const extractSingle = (val: unknown) => {
+    if (Array.isArray(val)) {
+      return val.length > 0 ? val[0] : undefined;
+    }
+    return val;
+  };
+
   // Helper to parse date from string, number, or Date
   const parseDate = (val: unknown): Date => {
     if (!val) return new Date();
@@ -22,11 +30,11 @@ function transformSprintFromStorage(sprint: Record<string, unknown>): Sprint {
   };
 
   const id = (sprint.id || sprint._id || sprint.__auto_id__) as string;
-  const projectId = (sprint.projectId || sprint.project_id) as string;
+  const projectIdRaw = sprint.projectId || sprint.project_id;
+  const projectId = (extractSingle(projectIdRaw) || '') as string;
   const name = (sprint.name || '') as string;
   const goal = (sprint.goal || '') as string;
   const status = (sprint.status || 'planned') as SprintStatus;
-  const bugIds = (sprint.bug_tracking_bugss || []) as string[];
   
   const startDate = parseDate(sprint.startDate || sprint.start_date);
   const endDate = parseDate(sprint.endDate || sprint.end_date);
@@ -41,7 +49,6 @@ function transformSprintFromStorage(sprint: Record<string, unknown>): Sprint {
     endDate,
     goal,
     status,
-    bugIds,
     createdAt,
     updatedAt,
   };

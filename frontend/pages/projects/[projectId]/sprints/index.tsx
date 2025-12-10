@@ -4,7 +4,7 @@ import { useProject, useSprints } from '@/lib/hooks/useData';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, Target, ArrowRight, Bug, Clock, CheckCircle2, CircleDashed, MoreVertical, PlayCircle, CheckSquare, CalendarClock } from 'lucide-react';
+import { CalendarIcon, Target, ArrowRight, Clock, CheckCircle2, CircleDashed, MoreVertical, PlayCircle, CheckSquare, CalendarClock } from 'lucide-react';
 import { CreateSprintDialog } from '@/components/SprintManagement/CreateSprintDialog';
 import { Sprint, SprintStatus } from '@/lib/models/sprint';
 import { cn } from '@/lib/utils';
@@ -113,10 +113,10 @@ export default function ProjectSprintsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-background">
       <div className="container mx-auto py-8 px-4 max-w-7xl">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-white dark:bg-card p-6 rounded-xl shadow-sm border border-slate-100 dark:border-border">
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <span className="cursor-pointer hover:text-primary" onClick={() => router.push('/projects')}>Projects</span>
@@ -125,9 +125,9 @@ export default function ProjectSprintsPage() {
               <span>/</span>
               <span className="font-medium text-foreground">Sprints</span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sprint Board</h1>
-            <p className="text-slate-500 mt-1">
-              Manage and track development cycles for <span className="font-medium text-slate-700">{project.name}</span>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-foreground">Sprint Board</h1>
+            <p className="text-slate-500 dark:text-muted-foreground mt-1">
+              Manage and track development cycles for <span className="font-medium text-slate-700 dark:text-foreground">{project.name}</span>
             </p>
           </div>
           <CreateSprintDialog 
@@ -139,12 +139,12 @@ export default function ProjectSprintsPage() {
         {/* Sprints Grid */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {sprints.length === 0 ? (
-            <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
-              <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                <Target className="h-8 w-8 text-slate-400" />
+            <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white dark:bg-card rounded-xl border border-dashed border-slate-300 dark:border-border">
+              <div className="h-16 w-16 bg-slate-50 dark:bg-muted rounded-full flex items-center justify-center mb-4">
+                <Target className="h-8 w-8 text-slate-400 dark:text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">No sprints yet</h3>
-              <p className="text-slate-500 max-w-sm text-center mt-2 mb-6">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground">No sprints yet</h3>
+              <p className="text-slate-500 dark:text-muted-foreground max-w-sm text-center mt-2 mb-6">
                 Create your first sprint to start tracking work items and managing your development cycle.
               </p>
               <CreateSprintDialog 
@@ -155,12 +155,11 @@ export default function ProjectSprintsPage() {
           ) : (
             sprints.map((sprint: Sprint) => {
               const statusConfig = getStatusConfig(sprint.status);
-              const bugCount = sprint.bugIds?.length || 0;
               
               return (
                 <Card 
                   key={sprint.id} 
-                  className="group cursor-pointer hover:shadow-lg transition-all duration-200 border-slate-200 overflow-hidden bg-white relative"
+                  className="group cursor-pointer hover:shadow-lg transition-all duration-200 border-slate-200 dark:border-border overflow-hidden bg-white dark:bg-card relative"
                   onClick={() => handleSprintClick(sprint.id)}
                 >
                   {/* Status Bar */}
@@ -169,10 +168,10 @@ export default function ProjectSprintsPage() {
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start gap-4">
                       <div>
-                        <CardTitle className="text-xl font-bold text-slate-900 group-hover:text-primary transition-colors">
+                        <CardTitle className="text-xl font-bold text-slate-900 dark:text-foreground group-hover:text-primary transition-colors">
                           {sprint.name}
                         </CardTitle>
-                        <div className="flex items-center gap-2 mt-2 text-sm text-slate-500">
+                        <div className="flex items-center gap-2 mt-2 text-sm text-slate-500 dark:text-muted-foreground">
                           <CalendarIcon className="h-4 w-4" />
                           <span>{formatDate(sprint.startDate)} - {formatDateYear(sprint.endDate)}</span>
                         </div>
@@ -228,28 +227,20 @@ export default function ProjectSprintsPage() {
                   <CardContent className="pb-3">
                     <div className="space-y-4">
                       {/* Goal Section */}
-                      <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                      <div className="bg-slate-50 dark:bg-muted rounded-lg p-3 border border-slate-100 dark:border-border">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-muted-foreground uppercase tracking-wider mb-1.5">
                           <Target className="h-3.5 w-3.5" />
                           Sprint Goal
                         </div>
-                        <p className="text-sm text-slate-700 leading-relaxed">
+                        <p className="text-sm text-slate-700 dark:text-foreground leading-relaxed">
                           {sprint.goal || "No goal set for this sprint."}
                         </p>
-                      </div>
-
-                      {/* Stats Row */}
-                      <div className="flex items-center gap-4 pt-1">
-                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-                          <Bug className="h-4 w-4 text-slate-500" />
-                          <span>{bugCount} {bugCount === 1 ? 'Issue' : 'Issues'}</span>
-                        </div>
                       </div>
                     </div>
                   </CardContent>
 
-                  <CardFooter className="pt-3 border-t border-slate-50 bg-slate-50/30">
-                    <Button variant="ghost" className="w-full justify-between text-slate-600 hover:text-primary hover:bg-primary/5 group-hover:font-medium">
+                  <CardFooter className="pt-3 border-t border-slate-50 dark:border-border bg-slate-50/30 dark:bg-muted/30">
+                    <Button variant="ghost" className="w-full justify-between text-slate-600 dark:text-muted-foreground hover:text-primary hover:bg-primary/5 group-hover:font-medium">
                       Open Board
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>

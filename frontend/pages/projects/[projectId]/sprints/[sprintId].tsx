@@ -1,11 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { useProject, useSprints, useUsers } from '@/lib/hooks/useData';
 import { bugApi } from '@/utils/apiClient';
-import { Bug, BugStatus, UserRole, BugTag } from '@/utils/types';
+import { Bug, BugStatus, UserRole, BugTag, BugPriority, BugSeverity } from '@/utils/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CalendarIcon, Target, AlertCircle, CheckCircle2, Clock, ArrowLeft } from 'lucide-react';
 import { BugCard } from '@/components/BugCard';
@@ -38,6 +46,40 @@ export default function SprintBoardPage() {
   const [validationDialogOpen, setValidationDialogOpen] = useState(false);
   const [pendingBugId, setPendingBugId] = useState<string | null>(null);
 
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Derived state from URL
+  const assigneeFilter = (router.query.assignedTo as string) || 'all';
+  const priorityFilter = (router.query.priority as string) || 'all';
+  const severityFilter = (router.query.severity as string) || 'all';
+  const typeFilter = (router.query.type as string) || 'all';
+
+  // Sync URL with search query
+  useEffect(() => {
+    if (!router.isReady) return;
+    const search = router.query.search as string;
+    if (search !== undefined) {
+      // Defer update to avoid synchronous state update warning
+      const timer = setTimeout(() => {
+        setSearchQuery(prev => (prev !== search ? search : prev));
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [router.isReady, router.query.search]);
+
+  const updateUrl = (updates: Record<string, string | undefined>) => {
+    const query = { ...router.query, ...updates };
+    
+    Object.keys(updates).forEach(key => {
+        if (updates[key] === undefined || updates[key] === 'all' || updates[key] === '') {
+            delete query[key];
+        }
+    });
+    
+    router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
+  };
+
   // Find current sprint from the cached list
   const sprint = useMemo(() => 
     sprints.find(s => s.id === sprintId), 
@@ -46,8 +88,15 @@ export default function SprintBoardPage() {
 
   // Fetch bugs for this sprint
   const { data: bugsData, mutate } = useSWR(
-    sprintId ? `/api/bugs?sprintId=${sprintId}` : null,
-    () => bugApi.getPaginated(100, undefined, { sprintId: sprintId as string }),
+    sprintId ? `/api/bugs?sprintId=${sprintId}&assignedTo=${assigneeFilter}&priority=${priorityFilter}&severity=${severityFilter}&type=${typeFilter}&search=${searchQuery}` : null,
+    () => bugApi.getPaginated(100, undefined, { 
+      sprintId: sprintId as string,
+      assignedTo: assigneeFilter,
+      priority: priorityFilter,
+      severity: severityFilter,
+      type: typeFilter,
+      search: searchQuery
+    }),
     {
       revalidateOnFocus: false,
     }
@@ -93,7 +142,7 @@ export default function SprintBoardPage() {
           assignedTo: userId === 'unassigned' ? '' : userId,
           assignedBy: currentUser.id
         });
-        mutate();
+        await mutate();
       }
     } catch (err) {
       console.error('Failed to assign bug:', err);
@@ -254,22 +303,22 @@ export default function SprintBoardPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50/50">
+    <div className="flex flex-col h-screen bg-gray-50/50 dark:bg-background">
       {/* Header */}
-      <div className="border-b bg-white px-6 py-4">
+      <div className="border-b bg-white dark:bg-card dark:border-border px-6 py-4">
         <div className="flex items-center gap-4 mb-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="dark:text-muted-foreground dark:hover:text-foreground">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Sprints
           </Button>
-          <div className="h-4 w-px bg-gray-200" />
+          <div className="h-4 w-px bg-gray-200 dark:bg-border" />
           <span className="text-sm text-muted-foreground">{project?.name}</span>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">{sprint.name}</h1>
+              <h1 className="text-2xl font-bold tracking-tight dark:text-foreground">{sprint.name}</h1>
               <Badge variant={sprint.status === 'active' ? 'default' : 'secondary'}>
                 {sprint.status}
               </Badge>
@@ -290,26 +339,108 @@ export default function SprintBoardPage() {
 
           <div className="flex items-center gap-6">
             <div className="text-right">
-              <div className="text-sm font-medium mb-1">Sprint Progress</div>
+              <div className="text-sm font-medium mb-1 dark:text-foreground">Sprint Progress</div>
               <div className="flex items-center gap-2">
-                <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="w-32 h-2 bg-gray-100 dark:bg-muted rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-green-500 transition-all duration-500"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <span className="text-sm font-bold">{progress}%</span>
+                <span className="text-sm font-bold dark:text-foreground">{progress}%</span>
               </div>
             </div>
             <div className="flex -space-x-2">
               {/* Placeholder for assignees avatars */}
               {Array.from(new Set(bugs.map(b => b.assignedTo).filter(Boolean))).slice(0, 4).map((userId, i) => (
-                <Avatar key={userId as string} className="border-2 border-white w-8 h-8">
-                  <AvatarFallback className="text-xs">U{i+1}</AvatarFallback>
+                <Avatar key={userId as string} className="border-2 border-white dark:border-card w-8 h-8">
+                  <AvatarFallback className="text-xs dark:bg-muted dark:text-muted-foreground">U{i+1}</AvatarFallback>
                 </Avatar>
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Filters */}
+        <div className="mt-6 flex flex-col sm:flex-row gap-4 items-center flex-wrap">
+            <Input
+              placeholder="Search bugs..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); updateUrl({ search: e.target.value }); }}
+              className="sm:max-w-xs"
+            />
+
+            {/* Type Filter */}
+            <Select
+              value={typeFilter}
+              onValueChange={(value) => { updateUrl({ type: value }); }}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="bug">Bug</SelectItem>
+                <SelectItem value="epic">Epic</SelectItem>
+                <SelectItem value="task">Task</SelectItem>
+                <SelectItem value="suggestion">Suggestion</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Severity Filter */}
+            <Select
+              value={severityFilter}
+              onValueChange={(value) => { updateUrl({ severity: value }); }}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Severity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Severities</SelectItem>
+                {Object.values(BugSeverity).map((severity) => (
+                  <SelectItem key={severity} value={severity}>
+                    {severity}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Priority Filter */}
+            <Select
+              value={priorityFilter}
+              onValueChange={(value) => { updateUrl({ priority: value }); }}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                {Object.values(BugPriority).map((priority) => (
+                  <SelectItem key={priority} value={priority}>
+                    {priority}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Assignee Filter */}
+            <Select
+              value={assigneeFilter}
+              onValueChange={(value) => { updateUrl({ assignedTo: value }); }}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Assignee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignees</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
         </div>
       </div>
 
@@ -344,13 +475,13 @@ export default function SprintBoardPage() {
               const colorClass = colConfig?.color || 'text-gray-500';
               
               return (
-                <KanbanBoard key={column.id} id={column.id} className="flex-1 flex flex-col min-w-[280px] bg-gray-100/50 rounded-lg p-4 border-0">
+                <KanbanBoard key={column.id} id={column.id} className="flex-1 flex flex-col min-w-[280px] bg-gray-100/50 dark:bg-muted/30 rounded-lg p-4 border-0">
                   <KanbanHeader className="p-0 mb-4 bg-transparent border-0">
                     <div className="flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <Icon className={`h-4 w-4 ${colorClass}`} />
-                        <h3 className="font-semibold text-sm text-gray-700">{column.name}</h3>
-                        <Badge variant="secondary" className="ml-2 text-xs">
+                        <h3 className="font-semibold text-sm text-gray-700 dark:text-foreground">{column.name}</h3>
+                        <Badge variant="secondary" className="ml-2 text-xs dark:bg-muted dark:text-muted-foreground">
                           {bugs.filter(b => b.status === column.id).length}
                         </Badge>
                       </div>

@@ -134,15 +134,15 @@ export default function BugsPage() {
     cursorsRef.current = cursors;
   }, [cursors]);
 
-  const loadData = useCallback(async (targetPage: number = 1, overrideCursor?: string | null) => {
+  const loadData = useCallback(async (targetPage: number = 1, overrideCursor?: string | null, silent: boolean = false) => {
     // For Kanban, require Project and Sprint selection
     if (viewMode === 'kanban' && (projectFilter === 'all' || sprintFilter === 'all')) {
         setBugs([]);
-        setIsLoading(false);
+        if (!silent) setIsLoading(false);
         return;
     }
 
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     setLoadError(null);
     
     try {
@@ -187,7 +187,7 @@ export default function BugsPage() {
       console.error('Failed to load bugs:', err);
       setLoadError(err as Error);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [statusFilter, projectFilter, sprintFilter, assigneeFilter, priorityFilter, severityFilter, typeFilter, searchQuery, viewMode]);
 
@@ -228,7 +228,7 @@ export default function BugsPage() {
           assignedTo: userId === 'unassigned' ? '' : userId,
           assignedBy: currentUser.id
         });
-        await loadData();
+        await loadData(page, undefined, true);
       }
     } catch (err) {
       console.error('Failed to assign bug:', err);

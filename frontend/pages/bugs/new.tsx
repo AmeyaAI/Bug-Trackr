@@ -143,10 +143,10 @@ export default function NewBugPage() {
 
   // Pre-select project from query parameter
   useEffect(() => {
-    if (router.query.projectId && typeof router.query.projectId === "string") {
+    if (router.isReady && router.query.projectId && typeof router.query.projectId === "string") {
       setValue("projectId", router.query.projectId, { shouldValidate: true });
     }
-  }, [router.query.projectId, setValue]);
+  }, [router.isReady, router.query.projectId, setValue]);
 
   const onSubmit = async (data: BugFormData) => {
     if (!currentUser) {

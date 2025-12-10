@@ -105,43 +105,43 @@ export default function Home() {
   return (
     <>
       {/* Always render the dashboard content */}
-      <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="p-8 bg-gray-50 dark:bg-neutral-900 min-h-screen">
         <div className="w-full space-y-8">
 
           {currentUser ? (
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-bold tracking-tight text-gray-900">Welcome Back, {currentUser.name}</h1>
+                <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">Welcome Back, {currentUser.name}</h1>
                 <p className="text-muted-foreground mt-2">
                   Here&apos;s the summary of the bug tracking activities so far.
                 </p>
               </div>
               <div className="flex flex-col items-end gap-3">
                 <div className="flex gap-3">
-                    <Button onClick={() => router.push('/bugs/new')} className="gap-2 bg-cyan-500 hover:bg-cyan-600 text-white">
+                    <Button onClick={() => router.push('/bugs/new')} className="gap-2 bg-cyan-500 hover:bg-cyan-600 text-white border-none">
                     <Plus className="w-4 h-4" /> Report Bug
                     </Button>
-                    <Button variant="outline" onClick={() => router.push('/projects/new')} className="gap-2">
+                    <Button variant="outline" onClick={() => router.push('/projects/new')} className="gap-2 dark:bg-neutral-800 dark:text-white dark:border-neutral-700 dark:hover:bg-neutral-700">
                     <Layout className="w-4 h-4" /> New Project
                     </Button>
                 </div>
                 
                 {/* Sprint Widget */}
-                {activeSprint && (
+                {activeSprint && activeSprint.projectId && (
                     <Link 
                         href={`/projects/${activeSprint.projectId}/sprints/${activeSprint.id}`}
                         target="_blank"
-                        className="bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex items-center gap-4 min-w-[280px] hover:shadow-md transition-all cursor-pointer"
+                        className="bg-white dark:bg-neutral-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-neutral-700 flex items-center gap-4 min-w-[280px] hover:shadow-md transition-all cursor-pointer"
                     >
-                        <div className="p-2 bg-cyan-50 rounded-md">
-                            <Calendar className="w-5 h-5 text-cyan-600" />
+                        <div className="p-2 bg-cyan-50 dark:bg-cyan-900/30 rounded-md">
+                            <Calendar className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                         </div>
                         <div className="flex-1">
                             <div className="flex justify-between items-center mb-1">
-                                <span className="text-sm font-semibold text-gray-900">{activeSprint.name}</span>
-                                <span className="text-xs font-medium text-cyan-600">{daysRemaining} Days Left</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">{activeSprint.name}</span>
+                                <span className="text-xs font-medium text-cyan-600 dark:text-cyan-400">{daysRemaining} Days Left</span>
                             </div>
-                            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 w-full bg-gray-100 dark:bg-neutral-700 rounded-full overflow-hidden">
                                 <div 
                                     className="h-full bg-cyan-500 rounded-full" 
                                     style={{ width: `${sprintProgress}%` }}
@@ -153,7 +153,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="p-4 bg-muted rounded-lg">
+            <div className="p-4 bg-muted rounded-lg dark:bg-neutral-800">
               <p className="text-sm text-muted-foreground">
                 Please select a user from the navigation to get started
               </p>
@@ -162,19 +162,19 @@ export default function Home() {
 
         {/* Bug Statistics Dashboard */}
         <div>
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Overview</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Overview</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Total Bugs */}
-            <Card className="bg-white shadow-sm hover:shadow-md transition-all border-l-4 border-l-cyan-500">
+            <Card className="bg-white dark:bg-neutral-800 shadow-sm hover:shadow-md transition-all border-l-4 border-l-cyan-500 dark:border-l-cyan-500 border-y dark:border-y-neutral-700 border-r dark:border-r-neutral-700">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Bugs</CardTitle>
-                <div className="p-2 bg-cyan-50 rounded-full">
-                  <BugIcon className="h-4 w-4 text-cyan-600" />
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Bugs</CardTitle>
+                <div className="p-2 bg-cyan-50 dark:bg-cyan-900/30 rounded-full">
+                  <BugIcon className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="flex items-baseline gap-2">
-                    <div className="text-2xl font-bold text-gray-900">{statistics.total}</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{statistics.total}</div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Across {projects.length} projects
@@ -183,16 +183,16 @@ export default function Home() {
             </Card>
 
             {/* Open Bugs */}
-            <Card className="bg-white shadow-sm hover:shadow-md transition-all border-l-4 border-l-red-500">
+            <Card className="bg-white dark:bg-neutral-800 shadow-sm hover:shadow-md transition-all border-l-4 border-l-red-500 dark:border-l-red-500 border-y dark:border-y-neutral-700 border-r dark:border-r-neutral-700">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Open Bugs</CardTitle>
-                <div className="p-2 bg-red-50 rounded-full">
-                  <AlertCircle className="h-4 w-4 text-red-500" />
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Open Bugs</CardTitle>
+                <div className="p-2 bg-red-50 dark:bg-red-900/30 rounded-full">
+                  <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="flex items-baseline gap-2">
-                    <div className="text-2xl font-bold text-gray-900">{statistics.open}</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{statistics.open}</div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {statistics.highest} highest, {statistics.high} high priority
@@ -201,15 +201,15 @@ export default function Home() {
             </Card>
 
             {/* In Progress */}
-            <Card className="bg-white shadow-sm hover:shadow-md transition-all border-l-4 border-l-blue-500">
+            <Card className="bg-white dark:bg-neutral-800 shadow-sm hover:shadow-md transition-all border-l-4 border-l-blue-500 dark:border-l-blue-500 border-y dark:border-y-neutral-700 border-r dark:border-r-neutral-700">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">In Progress</CardTitle>
-                <div className="p-2 bg-blue-50 rounded-full">
-                  <Clock className="h-4 w-4 text-blue-500" />
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</CardTitle>
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-full">
+                  <Clock className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{statistics.inProgress}</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{statistics.inProgress}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Being worked on
                 </p>
@@ -217,16 +217,16 @@ export default function Home() {
             </Card>
 
             {/* Resolved */}
-            <Card className="bg-white shadow-sm hover:shadow-md transition-all border-l-4 border-l-green-500">
+            <Card className="bg-white dark:bg-neutral-800 shadow-sm hover:shadow-md transition-all border-l-4 border-l-green-500 dark:border-l-green-500 border-y dark:border-y-neutral-700 border-r dark:border-r-neutral-700">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Resolved</CardTitle>
-                <div className="p-2 bg-green-50 rounded-full">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</CardTitle>
+                <div className="p-2 bg-green-50 dark:bg-green-900/30 rounded-full">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{statistics.resolved + statistics.closed}</div>
-                <div className="w-full bg-gray-100 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{statistics.resolved + statistics.closed}</div>
+                <div className="w-full bg-gray-100 dark:bg-neutral-700 h-1.5 rounded-full mt-2 overflow-hidden">
                     <div 
                         className="bg-green-500 h-full rounded-full" 
                         style={{ width: `${statistics.total > 0 ? ((statistics.resolved + statistics.closed) / statistics.total) * 100 : 0}%` }}
@@ -242,13 +242,13 @@ export default function Home() {
 
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-semibold text-gray-800">Assigned to Me</h2>
-              <div className="flex bg-gray-100 p-1 rounded-lg">
+              <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Assigned to Me</h2>
+              <div className="flex bg-gray-100 dark:bg-neutral-800 p-1 rounded-lg">
                   <button 
                     onClick={() => setAssignedTab('active')}
                     className={cn(
                         "px-3 py-1 text-sm font-medium rounded-md transition-all",
-                        assignedTab === 'active' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                        assignedTab === 'active' ? "bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     )}
                   >
                     Active
@@ -257,7 +257,7 @@ export default function Home() {
                     onClick={() => setAssignedTab('backlog')}
                     className={cn(
                         "px-3 py-1 text-sm font-medium rounded-md transition-all",
-                        assignedTab === 'backlog' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                        assignedTab === 'backlog' ? "bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     )}
                   >
                     Backlog
@@ -266,7 +266,7 @@ export default function Home() {
                     onClick={() => setAssignedTab('review')}
                     className={cn(
                         "px-3 py-1 text-sm font-medium rounded-md transition-all",
-                        assignedTab === 'review' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                        assignedTab === 'review' ? "bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                     )}
                   >
                     Review
@@ -277,13 +277,13 @@ export default function Home() {
             <div className="space-y-4">
               {filteredAssignedBugs.length > 0 ? (
                 filteredAssignedBugs.map((bug) => (
-                  <Card key={bug.id} className="bg-white hover:shadow-md transition-all cursor-pointer border-l-4 border-l-transparent hover:border-l-cyan-500" onClick={() => router.push(`/bugs/${bug.id}`)}>
+                  <Card key={bug.id} className="bg-white dark:bg-neutral-800 hover:shadow-md transition-all cursor-pointer border-l-4 border-l-transparent hover:border-l-cyan-500 dark:hover:border-l-cyan-500 border-y dark:border-y-neutral-700 border-r dark:border-r-neutral-700" onClick={() => router.push(`/bugs/${bug.id}`)}>
                     <CardContent className="p-4 flex items-center gap-4">
                       <PriorityIcon priority={bug.priority} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-mono text-muted-foreground">{bug.id}</span>
-                          <h3 className="font-medium truncate text-gray-900">{bug.title}</h3>
+                          <h3 className="font-medium truncate text-gray-900 dark:text-gray-100">{bug.title}</h3>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <Badge variant={getStatusBadgeVariant(bug.status)} className="text-[10px] px-1.5 py-0 h-5">
@@ -299,7 +299,7 @@ export default function Home() {
                         <div className="flex flex-col items-end">
                             <span className="text-[10px] text-muted-foreground mb-0.5">Reporter</span>
                             <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-[10px] bg-cyan-100 text-cyan-700">
+                                <AvatarFallback className="text-[10px] bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400">
                                     {/* We don't have reporter name easily here without fetching user, but we can use ID or just a placeholder */}
                                     U
                                 </AvatarFallback>
@@ -311,10 +311,10 @@ export default function Home() {
                   </Card>
                 ))
               ) : (
-                <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-200">
+                <div className="text-center py-12 bg-white dark:bg-neutral-800 rounded-lg border border-dashed border-gray-200 dark:border-neutral-700">
                   <p className="text-muted-foreground">No bugs found in {assignedTab} tab.</p>
                   {assignedTab === 'active' && (
-                      <Button variant="link" onClick={() => setAssignedTab('backlog')} className="text-cyan-600">
+                      <Button variant="link" onClick={() => setAssignedTab('backlog')} className="text-cyan-600 dark:text-cyan-400">
                           Check your backlog
                       </Button>
                   )}
@@ -325,7 +325,7 @@ export default function Home() {
             <Button 
                 variant="ghost" 
                 onClick={() => router.push({ pathname: '/bugs', query: { assignedTo: currentUser?.id } })} 
-                className="w-full text-muted-foreground hover:text-cyan-600"
+                className="w-full text-muted-foreground hover:text-cyan-600 dark:hover:text-cyan-400"
             >
                 View All Assigned Bugs <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
