@@ -16,6 +16,7 @@
 
 import { CollectionDBService } from './collectionDb';
 import { CacheService } from './cacheService';
+import { authService } from './authService';
 import { UserRepository } from '../repositories/userRepository';
 import { ProjectRepository } from '../repositories/projectRepository';
 import { BugRepository } from '../repositories/bugRepository';
@@ -62,9 +63,14 @@ export class ServiceContainer {
         debug: this.config.debug,
       });
       
+      // Use AuthService to get the token dynamically
+      const tokenProvider = () => {
+        return authService.getAccessToken();
+      };
+
       this.collectionDb = new CollectionDBService(
         this.config.collectionBaseUrl,
-        this.config.collectionApiKey
+        tokenProvider
       );
     }
     return this.collectionDb;

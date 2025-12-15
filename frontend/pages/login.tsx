@@ -1,64 +1,105 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useUser } from '@/contexts/UserContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/contexts/ToastContext';
 import { LogoIcon } from '@/components/AppSidebar';
 import dpodLogo from '@/assets/dpod.png';
 import { getServiceContainer } from '@/lib/services/serviceContainer';
+import { authService, AUTH_CONFIG } from '@/lib/services/authService';
+import { jwtDecode } from "jwt-decode";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { setCurrentUser } = useUser();
   const router = useRouter();
   const { showToast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const handleOAuthLogin = (signStatus: 'signin' | 'signup') => {
     try {
-      // Client-side authentication using Repository pattern
-      const services = getServiceContainer();
-      const userRepo = services.getUserRepository();
-      
-      // 1. Find user by email
-      const user = await userRepo.getByEmail(email);
+      const { authServerUrl, appName, schemaId, authProvider, authRequestType, authAppName, authSchemaId } = AUTH_CONFIG;
 
-      if (!user) {
-        throw new Error('User not found. Please check your email.');
-      }
+      const authUrlWithParams = `${authServerUrl}/user_auth?app_name=${encodeURIComponent(appName)}&schema_id=${encodeURIComponent(schemaId)}&auth_provider=${encodeURIComponent(authProvider)}&request_type=${encodeURIComponent(signStatus)}&auth_request_type=${encodeURIComponent(authRequestType)}&auth_app_name=${encodeURIComponent(authAppName)}&auth_schema_id=${encodeURIComponent(authSchemaId)}`;
 
-      // 2. Validate phone number (simple check as per previous implementation)
-      // Note: In a real app, we would hash this or use a proper auth provider.
-      // Here we compare the raw strings as stored in the DB.
-      if (user.phoneNumber !== phoneNumber) {
-        throw new Error('Invalid phone number.');
-      }
+      console.log("Auth URL:", authUrlWithParams);
 
-      // 3. Login successful
-      // Generate a mock token for compatibility with existing code that expects it
-      const token = `mock-jwt-token-${user.id}-${Date.now()}`;
+      const popup = window.open(authUrlWithParams, "oauthPopup", "width=500,height=600");
       
-      // Save token and user
-      localStorage.setItem('bugtrackr_token', token);
-      setCurrentUser(user);
+      const interval = setInterval(() => {
+          if (popup && popup.closed) {
+              clearInterval(interval);
+              console.log("Popup closed");
+              setIsLoading(false);
+          }
+      }, 1000);
       
-      showToast('success', 'Logged in successfully');
-      router.push('/');
+      setIsLoading(true);
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'An unknown error occurred';
-      showToast('error', message);
-    } finally {
+      console.log(error);
       setIsLoading(false);
+      showToast('error', 'Failed to open login popup');
     }
   };
+
+  const postLogin = async (queryParams: any) => {
+      try {
+          const { token, refresh_token } = queryParams;
+          
+          if (!token || !refresh_token) {
+              throw new Error('Tokens not found in login response');
+          }
+          
+          authService.setTokens(token, refresh_token);
+          
+          // Fetch user details
+          const services = getServiceContainer();
+          const userRepo = services.getUserRepository();
+          
+          // Try to get user ID from token
+          let user = null;
+          try {
+              const decoded = jwtDecode<any>(token);
+              if (decoded.user_id) {
+                  user = await userRepo.getById(decoded.user_id);
+              } else if (decoded.email) {
+                  user = await userRepo.getByEmail(decoded.email);
+              }
+          } catch (e) {
+              console.warn("Error decoding token or fetching user", e);
+          }
+
+          if (user) {
+              setCurrentUser(user);
+              showToast('success', 'Logged in successfully');
+              router.push('/');
+          } else {
+              showToast('success', 'Logged in successfully');
+              router.push('/');
+          }
+      } catch (error) {
+          console.error(error);
+          showToast('error', 'Login failed');
+          setIsLoading(false);
+      }
+  };
+
+  useEffect(() => {
+      const handlePopupMessage = async (event: MessageEvent) => {
+          if (event.data && event.data.type === "login-success") {
+              const { queryParams } = event.data;
+              await postLogin(queryParams);
+          }
+      };
+
+      window.addEventListener("message", handlePopupMessage);
+      return () => {
+          window.removeEventListener("message", handlePopupMessage);
+      };
+      //eslint-disable-next-line
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 dark:bg-neutral-900 p-4">
@@ -79,42 +120,44 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>
-            Enter your email and phone number to sign in
+            Sign in to your account to continue
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+        <CardContent className="space-y-4 flex flex-col items-center w-full">
+            <Button 
+                className="w-full" 
+                onClick={() => handleOAuthLogin('signin')}
                 disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="Enter your phone number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full" type="submit" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
+            >
+              {isLoading ? 'Processing...' : 'Sign in with Google'}
             </Button>
-          </CardFooter>
-        </form>
+            
+            <div className="relative w-full">
+                <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                        Or
+                    </span>
+                </div>
+            </div>
+
+            <Button 
+                variant="outline"
+                className="w-full" 
+                onClick={() => handleOAuthLogin('signup')}
+                
+                disabled={isLoading}
+            >
+              {isLoading ? 'Processing...' : 'Sign up with Google'}
+            </Button>
+        </CardContent>
+        <CardFooter className="justify-center">
+            <p className="text-xs text-muted-foreground">
+                By clicking continue, you agree to our Terms of Service and Privacy Policy.
+            </p>
+        </CardFooter>
       </Card>
     </div>
   );
