@@ -13,6 +13,7 @@ import { useRouter } from "next/router";
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const isLoginPage = router.pathname === '/login';
+  const isAuthorizedPage = router.pathname === '/authorized';
 
   return (
     <ErrorBoundary showDetails={process.env.NODE_ENV === 'development'}>
@@ -21,7 +22,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <UserProvider>
             <NavbarProvider>
               <AuthGuard>
-                {isLoginPage ? (
+                {isLoginPage || isAuthorizedPage ? (
                   <Component {...pageProps} />
                 ) : (
                   <AppSidebar>

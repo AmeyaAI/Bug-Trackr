@@ -17,8 +17,6 @@ const PII_FIELDS = [
   'apiKey',
   'api_key',
   'secret',
-  'phoneNumber',
-  'phone_number',
   'email',
   'ssn',
   'creditCard',

@@ -13,10 +13,6 @@ export const createUserSchema = z.object({
     required_error: 'User ID is required',
     invalid_type_error: 'User ID must be a string',
   }).min(1, 'User ID cannot be empty'),
-  phoneNumber: z.string({
-    required_error: 'Phone number is required',
-    invalid_type_error: 'Phone number must be a string',
-  }).min(1, 'Phone number cannot be empty'),
   name: z.string({
     required_error: 'Name is required',
     invalid_type_error: 'Name must be a string',
@@ -32,7 +28,6 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   userId: z.string().min(1).optional(),
-  phoneNumber: z.string().min(1).optional(),
   name: z.string().min(1).max(200).optional(),
   email: z.string().email().optional(),
   role: z.nativeEnum(UserRole).optional(),

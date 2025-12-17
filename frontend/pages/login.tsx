@@ -1,64 +1,156 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { useUser } from '@/contexts/UserContext';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/contexts/ToastContext';
 import { LogoIcon } from '@/components/AppSidebar';
 import dpodLogo from '@/assets/dpod.png';
-import { getServiceContainer } from '@/lib/services/serviceContainer';
-
+import { authService, AUTH_CONFIG } from '@/lib/services/authService';
+ 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { setCurrentUser } = useUser();
   const router = useRouter();
   const { showToast } = useToast();
+ 
+  useEffect(() => {
+    if (!router.isReady) return;
+    
+    // Check if we are returning from authorized page via redirect (Same Window Flow)
+    if (router.query.auth_callback === 'true') {
+        const token = authService.getAccessToken();
+        const refreshToken = authService.getRefreshToken();
+        if (token && refreshToken) {
+            setIsLoading(true);
+            postLogin({ token, refresh_token: refreshToken });
+        }
+    }
+  }, [router.isReady, router.query]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const postLogin = async (queryParams: any) => {
     try {
-      // Client-side authentication using Repository pattern
-      const services = getServiceContainer();
-      const userRepo = services.getUserRepository();
-      
-      // 1. Find user by email
-      const user = await userRepo.getByEmail(email);
-
-      if (!user) {
-        throw new Error('User not found. Please check your email.');
+      const { token, refresh_token } = queryParams;
+ 
+      if (!token || !refresh_token) {
+        throw new Error('Tokens not found in login response');
       }
-
-      // 2. Validate phone number (simple check as per previous implementation)
-      // Note: In a real app, we would hash this or use a proper auth provider.
-      // Here we compare the raw strings as stored in the DB.
-      if (user.phoneNumber !== phoneNumber) {
-        throw new Error('Invalid phone number.');
-      }
-
-      // 3. Login successful
-      // Generate a mock token for compatibility with existing code that expects it
-      const token = `mock-jwt-token-${user.id}-${Date.now()}`;
+ 
+      authService.setTokens(token, refresh_token);
       
-      // Save token and user
-      localStorage.setItem('bugtrackr_token', token);
-      setCurrentUser(user);
-      
-      showToast('success', 'Logged in successfully');
-      router.push('/');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'An unknown error occurred';
-      showToast('error', message);
-    } finally {
+      // Redirect to role selection page which will handle user fetching and role logic
+      router.push('/select-role');
+
+    } catch (error: any) {
+      console.error("login_error", error);
+      showToast('error', error.message || 'Login failed');
       setIsLoading(false);
+      authService.clearTokens();
     }
   };
+ 
+  useEffect(() => {
+    // Handle login success message (main window mode)
+    const handlePopupMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data?.type === 'login-success') {
+        await postLogin(event.data.queryParams);
+      }
+    };
+
+    // Listen on BroadcastChannel
+    const channel = new BroadcastChannel('auth_channel');
+    channel.onmessage = async (event) => {
+      if (event.data && event.data.type === 'login-success') {
+        const { queryParams } = event.data;
+        await postLogin(queryParams);
+      }
+    };
+
+    // Listen for Storage events (fallback if messaging fails)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'dpod-token' && e.newValue) {
+        const t = JSON.parse(e.newValue);
+        const r = authService.getRefreshToken();
+        if (t && r) {
+           postLogin({ token: t, refresh_token: r });
+        }
+      }
+    };
+
+    window.addEventListener('message', handlePopupMessage);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('message', handlePopupMessage);
+      window.removeEventListener('storage', handleStorageChange);
+      channel.close();
+    };
+  }, []);
+ 
+ 
+  const handleOAuthLogin = (signStatus: 'signin' | 'signup') => {
+    try {
+      const {
+        authServerUrl,
+        appName,
+        schemaId,
+        authProvider,
+        authRequestType,
+        authAppName,
+        authSchemaId
+      } = AUTH_CONFIG;
+ 
+      const authUrl =
+        `${authServerUrl}/user_auth` +
+        `?app_name=${encodeURIComponent(appName)}` +
+        `&schema_id=${encodeURIComponent(schemaId)}` +
+        `&auth_provider=${encodeURIComponent(authProvider)}` +
+        `&request_type=${encodeURIComponent(signStatus)}` +
+        `&auth_request_type=${encodeURIComponent(authRequestType)}` +
+        `&auth_app_name=${encodeURIComponent(authAppName)}` +
+        `&auth_schema_id=${encodeURIComponent(authSchemaId)}`;
+ 
+      const popup = window.open(authUrl, 'oauthPopup', 'width=500,height=600');
+ 
+      // We cannot poll popup.closed due to Cross-Origin-Opener-Policy (COOP) restrictions.
+      // Instead, we rely on the popup sending a message back or the storage event.
+      // We set a long timeout to reset the loading state just in case.
+      const timeout = setTimeout(() => {
+        setIsLoading(false);
+      }, 60000 * 2); // 2 minutes timeout
+
+      // Cleanup timeout if component unmounts
+      return () => clearTimeout(timeout);
+ 
+      setIsLoading(true);
+    } catch (error) {
+      console.error(error);
+      setIsLoading(false);
+      showToast('error', 'Failed to open login popup');
+    }
+  };
+ 
+ 
+  if (isLoading) {
+    return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 dark:bg-neutral-900 p-4">
+            <div className="animate-pulse flex flex-col items-center">
+                <div className="h-12 w-12 bg-blue-500 rounded-full mb-4"></div>
+                <h2 className="text-xl font-semibold">Processing Login...</h2>
+                <p className="text-sm text-gray-500">Please wait while we verify your credentials.</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 dark:bg-neutral-900 p-4">
@@ -72,6 +164,7 @@ export default function LoginPage() {
           priority
         />
       </div>
+ 
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 flex flex-col items-center text-center">
           <div className="mb-4 scale-150 p-2">
@@ -79,42 +172,43 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>
-            Enter your email and phone number to sign in
+            Sign in to your account to continue
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
+ 
+        <CardContent className="space-y-4 flex flex-col items-center w-full">
+          <Button
+            className="w-full"
+            onClick={() => handleOAuthLogin('signin')}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Processing...' : 'Sign in with Google'}
+          </Button>
+ 
+          <div className="relative w-full">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="Enter your phone number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-                disabled={isLoading}
-              />
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or</span>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full" type="submit" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </Button>
-          </CardFooter>
-        </form>
+          </div>
+ 
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleOAuthLogin('signup')}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Processing...' : 'Sign up with Google'}
+          </Button>
+        </CardContent>
+ 
+        <CardFooter className="justify-center">
+          <p className="text-xs text-muted-foreground">
+            By clicking continue, you agree to our Terms of Service and Privacy Policy.
+          </p>
+        </CardFooter>
       </Card>
     </div>
   );

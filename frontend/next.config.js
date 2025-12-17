@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['gsap'],
   output: 'export',
-  trailingSlash: true,
+  // trailingSlash: true,
   images: {
     unoptimized: true,
   },

@@ -65,28 +65,38 @@ interface CollectionDBResponse<T> {
  */
 export class CollectionDBService {
   private readonly baseUrl: string;
-  private readonly apiKey: string;
+  private readonly apiKeyProvider: () => string | null;
   private readonly timeout: number;
 
   /**
    * Creates a new Collection DB Service instance
    * @param baseUrl - Base URL for Collection DB (e.g., https://.../.../dpdo_bug_tracker)
-   * @param apiKey - API key for authentication
+   * @param apiKeyOrProvider - API key string or function that returns the key/token
    * @param timeout - Request timeout in milliseconds (default: 60000)
    */
-  constructor(baseUrl: string, apiKey: string, timeout: number = 60000) {
+  constructor(baseUrl: string, apiKeyOrProvider: string | (() => string | null), timeout: number = 60000) {
     if (!baseUrl || baseUrl.trim() === '') {
       throw new Error('Collection DB base URL is required');
     }
-    if (!apiKey || apiKey.trim() === '') {
-      throw new Error('Collection DB API key is required');
+    
+    if (!apiKeyOrProvider) {
+      throw new Error('Collection DB API key or provider is required');
     }
+
     if (timeout <= 0) {
       throw new Error('Timeout must be positive');
     }
 
     this.baseUrl = baseUrl.trim().replace(/\/$/, ''); // Remove trailing slash
-    this.apiKey = apiKey.trim();
+    
+    if (typeof apiKeyOrProvider === 'string') {
+      const key = apiKeyOrProvider.trim();
+      if (key === '') throw new Error('Collection DB API key cannot be empty');
+      this.apiKeyProvider = () => key;
+    } else {
+      this.apiKeyProvider = apiKeyOrProvider;
+    }
+
     this.timeout = timeout;
 
     logger.info('CollectionDBService initialized');
@@ -161,14 +171,21 @@ export class CollectionDBService {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
+      const apiKey = this.apiKeyProvider();
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...options.headers as Record<string, string>,
+      };
+
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-          ...options.headers,
-        },
+        headers,
       });
 
       clearTimeout(timeoutId);

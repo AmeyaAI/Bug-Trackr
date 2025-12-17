@@ -13,7 +13,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
   useEffect(() => {
     // If not loading and no user, redirect to login
-    if (!isLoading && !currentUser && router.pathname !== '/login') {
+    // Allow /authorized and /select-role page to load without user (they handle the login process)
+    if (!isLoading && !currentUser && router.pathname !== '/login' && router.pathname !== '/authorized' && router.pathname !== '/select-role') {
       router.push('/login');
     }
     // If logged in and on login page, redirect to home
@@ -26,8 +27,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     return <LoadingState message="Checking authentication..." />;
   }
 
-  // If not logged in and not on login page, don't render anything (waiting for redirect)
-  if (!currentUser && router.pathname !== '/login') {
+  // If not logged in and not on login/authorized/select-role page, don't render anything (waiting for redirect)
+  if (!currentUser && router.pathname !== '/login' && router.pathname !== '/authorized' && router.pathname !== '/select-role') {
     return null;
   }
 

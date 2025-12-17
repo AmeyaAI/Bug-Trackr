@@ -2,20 +2,26 @@ import React from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useUser } from '@/contexts/UserContext';
 import { useRouter } from 'next/router';
-import { IconMoon, IconSun, IconLogout } from '@tabler/icons-react';
+import { IconMoon, IconSun, IconLogout, IconUserCircle } from '@tabler/icons-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
+import { authService } from '@/lib/services/authService';
+
 export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
-  const { setCurrentUser } = useUser();
+  const { currentUser, setCurrentUser } = useUser();
   const router = useRouter();
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('bugtrackr_token');
+    authService.clearTokens();
     router.push('/login');
+  };
+
+  const handleChangeRole = () => {
+    router.push('/select-role');
   };
 
   return (
@@ -85,7 +91,27 @@ export default function SettingsPage() {
                 Manage your account session
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+              {/* Change Role Option - Only visible if user has multiple roles */}
+              {currentUser?.availableRoles && currentUser.availableRoles.length > 1 && (
+                <div className="flex items-center justify-between pb-6 border-b border-neutral-200 dark:border-neutral-800">
+                  <div className="space-y-1">
+                    <Label className="text-base">Active Role</Label>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      Current role: <span className="font-semibold capitalize text-primary">{currentUser.role}</span>
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleChangeRole}
+                    className="gap-2"
+                  >
+                    <IconUserCircle className="w-4 h-4" />
+                    Switch Role
+                  </Button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <Label className="text-base">Sign Out</Label>

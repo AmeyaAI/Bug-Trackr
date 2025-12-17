@@ -350,32 +350,6 @@ export const sprintApi = {
   },
 };
 
-// Auth API
-export const authApi = {
-  login: async (email: string, phoneNumber: string): Promise<{ user: User, token: string }> => {
-    return trackRequest((async () => {
-      const services = getServiceContainer();
-      const userRepo = services.getUserRepository();
-      
-      const user = await userRepo.getByEmail(email);
-
-      if (!user) {
-        throw new Error('Invalid credentials');
-      }
-
-      // Check phone number (acting as password)
-      if (user.phoneNumber !== phoneNumber) {
-        throw new Error('Invalid credentials');
-      }
-
-      // Generate a simple token (base64 of user ID + timestamp)
-      const token = btoa(`${user.id}:${Date.now()}`);
-
-      return { user, token };
-    })());
-  }
-};
-
 const apiClient = {
   bug: bugApi,
   comment: commentApi,
@@ -383,7 +357,6 @@ const apiClient = {
   user: userApi,
   activityLog: activityLogApi,
   sprint: sprintApi,
-  auth: authApi,
 };
 
 export default apiClient;

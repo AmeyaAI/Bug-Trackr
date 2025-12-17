@@ -11,10 +11,10 @@ export enum UserRole {
 export interface User {
   readonly id: string;              // from __auto_id__
   userId: string;
-  phoneNumber: string;              // PII: Handle with care, mask in logs
   name: string;                     // PII: Handle with care
   email: string;                    // PII: Handle with care, mask in logs
   role: UserRole;
+  availableRoles?: UserRole[];      // Roles available to the user in the organization
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
