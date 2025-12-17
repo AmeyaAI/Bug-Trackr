@@ -57,9 +57,9 @@ export default function AuthorizedPage() {
         // 4. Close Popup
         setTimeout(() => {
           window.close();
-          // Fallback: if close fails, redirect to home (since we are logged in now)
+          // Fallback: if close fails, redirect to role selection
           if (!window.opener || window.opener === window) {
-             router.push('/');
+             router.push('/select-role');
           }
         }, 500);
 

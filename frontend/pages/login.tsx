@@ -14,20 +14,26 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/contexts/ToastContext';
 import { LogoIcon } from '@/components/AppSidebar';
 import dpodLogo from '@/assets/dpod.png';
-import { getServiceContainer } from '@/lib/services/serviceContainer';
 import { authService, AUTH_CONFIG } from '@/lib/services/authService';
-import { jwtDecode } from 'jwt-decode';
  
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const { setCurrentUser } = useUser();
   const router = useRouter();
   const { showToast } = useToast();
  
   useEffect(() => {
     if (!router.isReady) return;
-    // This effect is now merged into the main logic below to avoid race conditions
-  }, [router.isReady]);
+    
+    // Check if we are returning from authorized page via redirect (Same Window Flow)
+    if (router.query.auth_callback === 'true') {
+        const token = authService.getAccessToken();
+        const refreshToken = authService.getRefreshToken();
+        if (token && refreshToken) {
+            setIsLoading(true);
+            postLogin({ token, refresh_token: refreshToken });
+        }
+    }
+  }, [router.isReady, router.query]);
 
   const postLogin = async (queryParams: any) => {
     try {
@@ -37,34 +43,16 @@ export default function LoginPage() {
         throw new Error('Tokens not found in login response');
       }
  
-      console.log(token, refresh_token)
- 
       authService.setTokens(token, refresh_token);
- 
-      const services = getServiceContainer();
-      const userRepo = services.getUserRepository();
- 
-      let user = null;
-      try {
-        const decoded = jwtDecode<any>(token);
-        if (decoded.user_id) {
-          user = await userRepo.getById(decoded.user_id);
-        } else if (decoded.email) {
-          user = await userRepo.getByEmail(decoded.email);
-        }
-      } catch (e) {
-        console.warn('Error decoding token or fetching user', e);
-      }
- 
-      console.log('user', user)
- 
-      setCurrentUser(user);
-      showToast('success', 'Logged in successfully');
-      router.push('/');
-    } catch (error) {
+      
+      // Redirect to role selection page which will handle user fetching and role logic
+      router.push('/select-role');
+
+    } catch (error: any) {
       console.error("login_error", error);
-      showToast('error', 'Login failed');
+      showToast('error', error.message || 'Login failed');
       setIsLoading(false);
+      authService.clearTokens();
     }
   };
  

@@ -34,13 +34,14 @@ export function loadConfig(): AppConfig {
   if (!collectionBaseUrl || collectionBaseUrl.trim() === '') {
     throw new Error('Missing required environment variable: NEXT_PUBLIC_APPFLYTE_COLLECTION_BASE_URL');
   }
-  if (!collectionApiKey || collectionApiKey.trim() === '') {
-    throw new Error('Missing required environment variable: NEXT_PUBLIC_APPFLYTE_COLLECTION_API_KEY');
-  }
+  // API Key is now optional as we use dynamic tokens
+  // if (!collectionApiKey || collectionApiKey.trim() === '') {
+  //   throw new Error('Missing required environment variable: NEXT_PUBLIC_APPFLYTE_COLLECTION_API_KEY');
+  // }
   
   // Trim values before validation
   const trimmedUrl = collectionBaseUrl.trim();
-  const trimmedApiKey = collectionApiKey.trim();
+  const trimmedApiKey = collectionApiKey ? collectionApiKey.trim() : '';
   
   // Validate URL format
   try {

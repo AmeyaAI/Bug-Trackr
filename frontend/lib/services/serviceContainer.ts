@@ -31,7 +31,8 @@ import { logger } from '../utils/logger';
  * Provides dependency injection and lifecycle management with lazy initialization
  */
 export class ServiceContainer {
-  private collectionDb: CollectionDBService | null = null;
+  private userCollectionDb: CollectionDBService | null = null;
+  private appCollectionDb: CollectionDBService | null = null;
   private cacheService: CacheService | null = null;
   private userRepository: UserRepository | null = null;
   private projectRepository: ProjectRepository | null = null;
@@ -41,6 +42,9 @@ export class ServiceContainer {
   private activityRepository: ActivityRepository | null = null;
   private config: AppConfig;
   private isActive: boolean = true;
+
+  private readonly USER_SCHEMA_ID = 'ameya_appflyte';
+  private readonly APP_SCHEMA_ID = '555de65f-2ffd-456b-9745-750f1251bc1f';
 
   /**
    * Creates a new ServiceContainer instance
@@ -53,27 +57,65 @@ export class ServiceContainer {
   }
 
   /**
-   * Lazily initializes the Collection DB service
+   * Lazily initializes the Collection DB service for User Schema
    * @returns CollectionDBService instance
    */
-  private initializeCollectionDB(): CollectionDBService {
-    if (!this.collectionDb) {
-      logger.debug('Lazy initializing Collection DB service', {
+  private initializeUserCollectionDB(): CollectionDBService {
+    if (!this.userCollectionDb) {
+      logger.debug('Lazy initializing User Collection DB service', {
         baseUrl: this.config.collectionBaseUrl,
         debug: this.config.debug,
       });
       
-      // Use AuthService to get the token dynamically
       const tokenProvider = () => {
-        return authService.getAccessToken();
+        const token = authService.getAccessToken();
+        if (!token) {
+            logger.warn('No access token available for Collection DB request');
+            return null;
+        }
+        return token;
       };
 
-      this.collectionDb = new CollectionDBService(
-        this.config.collectionBaseUrl,
+      // Append User Schema ID to base URL
+      const baseUrl = `${this.config.collectionBaseUrl}${this.USER_SCHEMA_ID}`;
+
+      this.userCollectionDb = new CollectionDBService(
+        baseUrl,
         tokenProvider
       );
     }
-    return this.collectionDb;
+    return this.userCollectionDb;
+  }
+
+  /**
+   * Lazily initializes the Collection DB service for App Schema
+   * @returns CollectionDBService instance
+   */
+  private initializeAppCollectionDB(): CollectionDBService {
+    if (!this.appCollectionDb) {
+      logger.debug('Lazy initializing App Collection DB service', {
+        baseUrl: this.config.collectionBaseUrl,
+        debug: this.config.debug,
+      });
+      
+      const tokenProvider = () => {
+        const token = authService.getAccessToken();
+        if (!token) {
+            logger.warn('No access token available for Collection DB request');
+            return null;
+        }
+        return token;
+      };
+
+      // Append App Schema ID to base URL
+      const baseUrl = `${this.config.collectionBaseUrl}${this.APP_SCHEMA_ID}`;
+
+      this.appCollectionDb = new CollectionDBService(
+        baseUrl,
+        tokenProvider
+      );
+    }
+    return this.appCollectionDb;
   }
 
   /**
@@ -96,7 +138,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.userRepository) {
       logger.debug('Lazy initializing UserRepository');
-      this.userRepository = new UserRepository(this.initializeCollectionDB(), this.getCacheService());
+      this.userRepository = new UserRepository(this.initializeUserCollectionDB(), this.getCacheService());
     }
     return this.userRepository;
   }
@@ -109,7 +151,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.projectRepository) {
       logger.debug('Lazy initializing ProjectRepository');
-      this.projectRepository = new ProjectRepository(this.initializeCollectionDB(), this.getCacheService());
+      this.projectRepository = new ProjectRepository(this.initializeAppCollectionDB(), this.getCacheService());
     }
     return this.projectRepository;
   }
@@ -122,7 +164,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.bugRepository) {
       logger.debug('Lazy initializing BugRepository');
-      this.bugRepository = new BugRepository(this.initializeCollectionDB(), this.getCacheService());
+      this.bugRepository = new BugRepository(this.initializeAppCollectionDB(), this.getCacheService());
     }
     return this.bugRepository;
   }
@@ -135,7 +177,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.sprintRepository) {
       logger.debug('Lazy initializing SprintRepository');
-      this.sprintRepository = new SprintRepository(this.initializeCollectionDB(), this.getCacheService());
+      this.sprintRepository = new SprintRepository(this.initializeAppCollectionDB(), this.getCacheService());
     }
     return this.sprintRepository;
   }
@@ -148,7 +190,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.commentRepository) {
       logger.debug('Lazy initializing CommentRepository');
-      this.commentRepository = new CommentRepository(this.initializeCollectionDB(), this.getCacheService());
+      this.commentRepository = new CommentRepository(this.initializeAppCollectionDB(), this.getCacheService());
     }
     return this.commentRepository;
   }
@@ -161,7 +203,7 @@ export class ServiceContainer {
     this.ensureActive();
     if (!this.activityRepository) {
       logger.debug('Lazy initializing ActivityRepository');
-      this.activityRepository = new ActivityRepository(this.initializeCollectionDB(), this.getCacheService());
+      this.activityRepository = new ActivityRepository(this.initializeAppCollectionDB(), this.getCacheService());
     }
     return this.activityRepository;
   }
@@ -169,10 +211,11 @@ export class ServiceContainer {
   /**
    * Gets the Collection DB service instance (lazy initialization)
    * @returns CollectionDBService for direct database operations
+   * @deprecated Use specific repository or initializeAppCollectionDB/initializeUserCollectionDB internally
    */
   getCollectionDBService(): CollectionDBService {
     this.ensureActive();
-    return this.initializeCollectionDB();
+    return this.initializeAppCollectionDB();
   }
 
   /**
@@ -216,9 +259,12 @@ export class ServiceContainer {
     logger.info('Shutting down ServiceContainer');
     
     try {
-      // Close Collection DB service if it was initialized
-      if (this.collectionDb) {
-        await this.collectionDb.close();
+      // Close Collection DB services if they were initialized
+      if (this.userCollectionDb) {
+        await this.userCollectionDb.close();
+      }
+      if (this.appCollectionDb) {
+        await this.appCollectionDb.close();
       }
 
       // Clear cache
@@ -233,7 +279,8 @@ export class ServiceContainer {
       this.sprintRepository = null;
       this.commentRepository = null;
       this.activityRepository = null;
-      this.collectionDb = null;
+      this.userCollectionDb = null;
+      this.appCollectionDb = null;
       
       // Mark container as inactive
       this.isActive = false;
