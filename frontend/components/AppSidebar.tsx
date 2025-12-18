@@ -13,11 +13,14 @@ import {
   IconFolder,
   IconHome,
   IconSettings,
+  IconUsers,
 } from "@tabler/icons-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { SidebarUserSelector } from "@/components/SidebarUserSelector";
 import { useUsers } from "@/lib/hooks/useData";
+import { useUser } from "@/contexts/UserContext";
+import { UserRole } from "@/utils/types";
 import Link from "next/link";
 
 interface AppSidebarProps {
@@ -27,6 +30,7 @@ interface AppSidebarProps {
 export function AppSidebar({ children }: AppSidebarProps) {
   const [open, setOpen] = useState(false);
   const { users, isLoading: isLoadingUsers } = useUsers();
+  const { hasRole } = useUser();
 
   const links = [
     {
@@ -50,6 +54,13 @@ export function AppSidebar({ children }: AppSidebarProps) {
         <IconFolder className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
     },
+    ...(hasRole(UserRole.ADMIN) ? [{
+      label: "Group Management",
+      href: "/user-management",
+      icon: (
+        <IconUsers className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+      ),
+    }] : []),
     {
       label: "Settings",
       href: "/settings",

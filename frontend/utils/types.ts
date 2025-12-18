@@ -85,6 +85,7 @@ export interface User {
   name: string;
   email: string;
   role: string;
+  availableRoles?: string[];
   createdAt?: Date;
   updatedAt?: Date;
 }
