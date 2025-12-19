@@ -115,11 +115,6 @@ export class UserRepository {
     // Update cache
     this.cacheService.set(CACHE_KEY_ALL, users);
     
-    // Also populate individual user cache to speed up getById calls
-    users.forEach(user => {
-      this.cacheService.set(`user:${user.id}`, user);
-    });
-
     logger.info('Users fetched successfully', { count: users.length });
     return users;
   }
@@ -217,7 +212,7 @@ export class UserRepository {
         const groupMembers = await this.collectionDb.queryItems<DbGroupMember>(
             COLLECTION_GROUP_MEMBERS_PLURAL,
             [{ field_name: 'payload.user', field_value: dbUser.id, operator: 'like' }],
-            { includeDetail: false }
+            { includeDetail: false, pageSize: 1000 }
         );
 
         logger.debug('Fetched group members', { count: groupMembers.length });
@@ -239,7 +234,7 @@ export class UserRepository {
         const orgGroups = await this.collectionDb.queryItems<DbGroup>(
             COLLECTION_GROUPS_PLURAL,
             [{ field_name: 'payload.organizations', field_value: ORG_ID, operator: 'like' }],
-            { includeDetail: false }
+            { includeDetail: false, pageSize: 1000 }
         );
 
         logger.debug('Fetched org groups', { count: orgGroups.length });
