@@ -9,6 +9,7 @@ import { ToastContainer } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useRouter } from "next/router";
+import { ChatbotIntegration } from "@/components/ChatbotIntegration";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function App({ Component, pageProps }: AppProps) {
                   </AppSidebar>
                 )}
                 <ToastContainer />
+                <ChatbotIntegration />
               </AuthGuard>
             </NavbarProvider>
           </UserProvider>
