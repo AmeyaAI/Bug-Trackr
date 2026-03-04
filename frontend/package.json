@@ -3,11 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3005",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "test": "playwright test",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:smoke": "playwright test --project=chromium --grep '@smoke'",
+    "test:e2e:p0": "playwright test --project=chromium --grep '@p0'",
+    "test:e2e:p0-p1": "playwright test --project=chromium --grep '@p0|@p1'",
+    "test:e2e:regression": "playwright test --project=chromium --grep '@regression'",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report"
   },
@@ -52,7 +57,9 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@faker-js/faker": "^10.3.0",
     "@playwright/test": "^1.56.1",
+    "@seontechnologies/playwright-utils": "^3.14.0",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.42",
     "@types/react-dom": "^18.2.17",
