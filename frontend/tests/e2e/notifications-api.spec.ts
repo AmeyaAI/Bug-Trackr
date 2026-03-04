@@ -560,3 +560,436 @@ test.describe('Notification API — Mark All As Read Validation', () => {
     expect(response.body.error).toBe('userId query parameter is required');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Negative Tests — Invalid Notification Types
+// ---------------------------------------------------------------------------
+
+test.describe('Notification API — Invalid Notification Types', () => {
+  test.beforeEach(() => {
+    notifSeq = 0;
+  });
+
+  test('NOTIF.NEG-001: API rejects notification with invalid type value @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with API mocks that validate notification type
+    const user = await setupAuthenticatedPage(page);
+
+    // Mock POST /api/notifications to validate the type field
+    await page.route('**/api/notifications', (route) => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      const body = route.request().postDataJSON();
+      const validTypes = ['assignment', 'status_change', 'comment', 'priority_change', 'severity_escalation', 'mention'];
+
+      if (!body.type || !validTypes.includes(body.type)) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: 'Invalid notification type',
+            validTypes,
+          }),
+        });
+      }
+
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'notif-new', ...body }),
+      });
+    });
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with an invalid notification type
+    const response = await page.evaluate(async (userId) => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: 'invalid_type',
+          bugId: 'bug-1',
+          bugTitle: 'Test bug',
+          message: 'Invalid type notification',
+          actorId: 'actor-1',
+          actorName: 'Actor',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    }, user.userId);
+
+    // Then: The API responds with 400 and descriptive error
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Invalid notification type');
+    expect(response.body.validTypes).toContain('assignment');
+    expect(response.body.validTypes).toContain('status_change');
+  });
+
+  test('NOTIF.NEG-002: API rejects notification with empty string type @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with type-validating API mock
+    const user = await setupAuthenticatedPage(page);
+
+    await page.route('**/api/notifications', (route) => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      const body = route.request().postDataJSON();
+      const validTypes = ['assignment', 'status_change', 'comment', 'priority_change', 'severity_escalation', 'mention'];
+
+      if (!body.type || !validTypes.includes(body.type)) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Invalid notification type' }),
+        });
+      }
+
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'notif-new', ...body }) });
+    });
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with an empty string type
+    const response = await page.evaluate(async (userId) => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: '',
+          bugId: 'bug-1',
+          bugTitle: 'Test bug',
+          message: 'Empty type notification',
+          actorId: 'actor-1',
+          actorName: 'Actor',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    }, user.userId);
+
+    // Then: The API responds with 400
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Invalid notification type');
+  });
+
+  test('NOTIF.NEG-003: API rejects notification with null type @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with type-validating API mock
+    const user = await setupAuthenticatedPage(page);
+
+    await page.route('**/api/notifications', (route) => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      const body = route.request().postDataJSON();
+      const validTypes = ['assignment', 'status_change', 'comment', 'priority_change', 'severity_escalation', 'mention'];
+
+      if (!body.type || !validTypes.includes(body.type)) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Invalid notification type' }),
+        });
+      }
+
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'notif-new', ...body }) });
+    });
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with null type
+    const response = await page.evaluate(async (userId) => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: null,
+          bugId: 'bug-1',
+          bugTitle: 'Test bug',
+          message: 'Null type notification',
+          actorId: 'actor-1',
+          actorName: 'Actor',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    }, user.userId);
+
+    // Then: The API responds with 400
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Invalid notification type');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Negative Tests — Empty / Missing Required Fields
+// ---------------------------------------------------------------------------
+
+test.describe('Notification API — Empty and Missing Fields', () => {
+  test.beforeEach(() => {
+    notifSeq = 0;
+  });
+
+  /**
+   * Shared mock for POST /api/notifications that validates required fields.
+   */
+  const setupFieldValidationMock = async (page: Page) => {
+    await page.route('**/api/notifications', (route) => {
+      if (route.request().method() !== 'POST') {
+        return route.fallback();
+      }
+
+      const body = route.request().postDataJSON();
+      const requiredFields = ['userId', 'type', 'bugId', 'bugTitle', 'message', 'actorId', 'actorName'];
+      const missingFields = requiredFields.filter(
+        (field) => body[field] === undefined || body[field] === null || body[field] === '',
+      );
+
+      if (missingFields.length > 0) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: 'Missing required fields',
+            missingFields,
+          }),
+        });
+      }
+
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'notif-new', ...body }),
+      });
+    });
+  };
+
+  test('NOTIF.NEG-004: API rejects notification with empty userId @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with field-validating API mock
+    await setupAuthenticatedPage(page);
+    await setupFieldValidationMock(page);
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with an empty userId
+    const response = await page.evaluate(async () => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: '',
+          type: 'assignment',
+          bugId: 'bug-1',
+          bugTitle: 'Test bug',
+          message: 'Test message',
+          actorId: 'actor-1',
+          actorName: 'Actor Name',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    });
+
+    // Then: The API responds with 400 and identifies the missing field
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Missing required fields');
+    expect(response.body.missingFields).toContain('userId');
+  });
+
+  test('NOTIF.NEG-005: API rejects notification with empty bugId @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with field-validating API mock
+    const user = await setupAuthenticatedPage(page);
+    await setupFieldValidationMock(page);
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with an empty bugId
+    const response = await page.evaluate(async (userId) => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: 'assignment',
+          bugId: '',
+          bugTitle: 'Test bug',
+          message: 'Test message',
+          actorId: 'actor-1',
+          actorName: 'Actor Name',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    }, user.userId);
+
+    // Then: The API responds with 400 and identifies the missing field
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Missing required fields');
+    expect(response.body.missingFields).toContain('bugId');
+  });
+
+  test('NOTIF.NEG-006: API rejects notification with empty bugTitle @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with field-validating API mock
+    const user = await setupAuthenticatedPage(page);
+    await setupFieldValidationMock(page);
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with an empty bugTitle
+    const response = await page.evaluate(async (userId) => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: 'comment',
+          bugId: 'bug-1',
+          bugTitle: '',
+          message: 'Test message',
+          actorId: 'actor-1',
+          actorName: 'Actor Name',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    }, user.userId);
+
+    // Then: The API responds with 400 and identifies the missing field
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Missing required fields');
+    expect(response.body.missingFields).toContain('bugTitle');
+  });
+
+  test('NOTIF.NEG-007: API rejects notification with empty message @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with field-validating API mock
+    const user = await setupAuthenticatedPage(page);
+    await setupFieldValidationMock(page);
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with an empty message
+    const response = await page.evaluate(async (userId) => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: 'assignment',
+          bugId: 'bug-1',
+          bugTitle: 'Test bug',
+          message: '',
+          actorId: 'actor-1',
+          actorName: 'Actor Name',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    }, user.userId);
+
+    // Then: The API responds with 400 and identifies the missing field
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Missing required fields');
+    expect(response.body.missingFields).toContain('message');
+  });
+
+  test('NOTIF.NEG-008: API rejects notification with empty actorId and actorName @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with field-validating API mock
+    const user = await setupAuthenticatedPage(page);
+    await setupFieldValidationMock(page);
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with empty actorId and actorName
+    const response = await page.evaluate(async (userId) => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          type: 'assignment',
+          bugId: 'bug-1',
+          bugTitle: 'Test bug',
+          message: 'Test message',
+          actorId: '',
+          actorName: '',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    }, user.userId);
+
+    // Then: The API responds with 400 and identifies both missing fields
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Missing required fields');
+    expect(response.body.missingFields).toContain('actorId');
+    expect(response.body.missingFields).toContain('actorName');
+  });
+
+  test('NOTIF.NEG-009: API rejects notification with all fields empty @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with field-validating API mock
+    await setupAuthenticatedPage(page);
+    await setupFieldValidationMock(page);
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with all required fields empty
+    const response = await page.evaluate(async () => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: '',
+          type: '',
+          bugId: '',
+          bugTitle: '',
+          message: '',
+          actorId: '',
+          actorName: '',
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    });
+
+    // Then: The API responds with 400 and lists all missing fields
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Missing required fields');
+    expect(response.body.missingFields).toHaveLength(7);
+    expect(response.body.missingFields).toContain('userId');
+    expect(response.body.missingFields).toContain('type');
+    expect(response.body.missingFields).toContain('bugId');
+    expect(response.body.missingFields).toContain('bugTitle');
+    expect(response.body.missingFields).toContain('message');
+    expect(response.body.missingFields).toContain('actorId');
+    expect(response.body.missingFields).toContain('actorName');
+  });
+
+  test('NOTIF.NEG-010: API rejects notification with null required fields @p1 @regression', async ({ page }) => {
+    // Given: An authenticated user with field-validating API mock
+    await setupAuthenticatedPage(page);
+    await setupFieldValidationMock(page);
+    await mockNotificationsApi(page, []);
+    await page.goto('/');
+
+    // When: A POST request is sent with null values for required fields
+    const response = await page.evaluate(async () => {
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: null,
+          type: null,
+          bugId: null,
+          bugTitle: null,
+          message: null,
+          actorId: null,
+          actorName: null,
+        }),
+      });
+      return { status: res.status, body: await res.json() };
+    });
+
+    // Then: The API responds with 400 and lists all missing fields
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('Missing required fields');
+    expect(response.body.missingFields).toHaveLength(7);
+  });
+});

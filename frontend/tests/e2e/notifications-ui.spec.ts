@@ -397,3 +397,214 @@ test.describe('Notifications Page (Story 2.2)', () => {
     await expect(page.locator('[data-testid="notification-item"]')).toHaveCount(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Negative Tests — UI Resilience for Invalid Types & Empty Fields
+// ---------------------------------------------------------------------------
+
+test.describe('Notification UI — Invalid Type Resilience', () => {
+  test('NOTIF.UI-NEG-001: UI renders notification with unrecognized type without crashing @p2 @regression', async ({ page }) => {
+    // Given: A user has a notification with an invalid/unknown type field
+    const user = createUser({ name: 'Invalid Type UI Tester' });
+
+    // Intentionally use 'as any' to bypass TypeScript type checking for the negative test
+    const invalidTypeNotification = createNotification({
+      userId: user.userId,
+      type: 'unknown_type' as any,
+      bugTitle: 'Bug with unknown type',
+      message: 'This notification has an unrecognized type',
+      isRead: false,
+    });
+
+    await setupNotificationsPage(page, {
+      user,
+      notifications: [invalidTypeNotification],
+      notificationCount: 1,
+    });
+
+    // When: User navigates to the notifications page
+    await page.goto('/notifications');
+
+    // Then: The page loads without crashing
+    await expect(page.locator('[data-testid="notification-item"]')).toHaveCount(1);
+
+    // And: The notification message is still visible (graceful rendering)
+    await expect(page.getByText('This notification has an unrecognized type')).toBeVisible();
+  });
+
+  test('NOTIF.UI-NEG-002: Dropdown renders notification with invalid type gracefully @p2 @regression', async ({ page }) => {
+    // Given: A user with a mix of valid and invalid type notifications
+    const user = createUser({ name: 'Invalid Type Dropdown Tester' });
+
+    const validNotification = createAssignmentNotification({
+      userId: user.userId,
+      bugTitle: 'Valid assignment bug',
+      message: 'You were assigned to a bug',
+      isRead: false,
+    });
+    const invalidNotification = createNotification({
+      userId: user.userId,
+      type: 'nonexistent_event' as any,
+      bugTitle: 'Invalid type bug',
+      message: 'Notification with bad type',
+      isRead: false,
+    });
+
+    await setupNotificationsPage(page, {
+      user,
+      notifications: [validNotification, invalidNotification],
+      notificationCount: 2,
+    });
+
+    // When: User opens the notification dropdown
+    await page.goto('/');
+    await page.locator('[data-testid="notification-bell"]').click();
+
+    // Then: The dropdown opens and shows both notifications (doesn't crash)
+    await expect(page.locator('[data-testid="notification-dropdown"]')).toBeVisible();
+    await expect(page.locator('[data-testid="notification-item"]')).toHaveCount(2);
+
+    // And: Both notification messages are rendered
+    await expect(page.getByText('You were assigned to a bug')).toBeVisible();
+    await expect(page.getByText('Notification with bad type')).toBeVisible();
+  });
+});
+
+test.describe('Notification UI — Empty Field Resilience', () => {
+  test('NOTIF.UI-NEG-003: UI renders notification with empty message field gracefully @p2 @regression', async ({ page }) => {
+    // Given: A user has a notification with an empty message field
+    const user = createUser({ name: 'Empty Msg UI Tester' });
+
+    const emptyMsgNotification = createNotification({
+      userId: user.userId,
+      type: 'assignment',
+      bugTitle: 'Bug with no message',
+      message: '',
+      isRead: false,
+    });
+
+    await setupNotificationsPage(page, {
+      user,
+      notifications: [emptyMsgNotification],
+      notificationCount: 1,
+    });
+
+    // When: User navigates to the notifications page
+    await page.goto('/notifications');
+
+    // Then: The page renders without crashing — at least the notification item exists
+    await expect(page.locator('[data-testid="notification-item"]')).toHaveCount(1);
+
+    // And: The bug title is still shown as a fallback
+    await expect(page.getByText('Bug with no message')).toBeVisible();
+  });
+
+  test('NOTIF.UI-NEG-004: UI renders notification with empty bugTitle gracefully @p2 @regression', async ({ page }) => {
+    // Given: A user has a notification with an empty bugTitle
+    const user = createUser({ name: 'Empty Title UI Tester' });
+
+    const emptyTitleNotification = createNotification({
+      userId: user.userId,
+      type: 'comment',
+      bugTitle: '',
+      message: 'Comment on unnamed bug',
+      isRead: false,
+    });
+
+    await setupNotificationsPage(page, {
+      user,
+      notifications: [emptyTitleNotification],
+      notificationCount: 1,
+    });
+
+    // When: User navigates to the notifications page
+    await page.goto('/notifications');
+
+    // Then: The page renders without crashing
+    await expect(page.locator('[data-testid="notification-item"]')).toHaveCount(1);
+
+    // And: The notification message is still visible
+    await expect(page.getByText('Comment on unnamed bug')).toBeVisible();
+  });
+
+  test('NOTIF.UI-NEG-005: UI renders notification with empty actorName gracefully @p2 @regression', async ({ page }) => {
+    // Given: A user has a notification with an empty actorName
+    const user = createUser({ name: 'Empty Actor UI Tester' });
+
+    const emptyActorNotification = createNotification({
+      userId: user.userId,
+      type: 'status_change',
+      bugTitle: 'Status change bug',
+      message: 'Bug status changed to Resolved',
+      actorName: '',
+      isRead: false,
+    });
+
+    await setupNotificationsPage(page, {
+      user,
+      notifications: [emptyActorNotification],
+      notificationCount: 1,
+    });
+
+    // When: User opens the notification dropdown
+    await page.goto('/');
+    await page.locator('[data-testid="notification-bell"]').click();
+
+    // Then: The dropdown renders without crashing
+    await expect(page.locator('[data-testid="notification-dropdown"]')).toBeVisible();
+    await expect(page.locator('[data-testid="notification-item"]')).toHaveCount(1);
+
+    // And: The notification is displayed with available information
+    await expect(page.getByText(/status changed|Resolved/i)).toBeVisible();
+  });
+
+  test('NOTIF.UI-NEG-006: Notifications page handles multiple notifications with missing fields @p2 @regression', async ({ page }) => {
+    // Given: A user has several notifications with various empty fields
+    const user = createUser({ name: 'Multi Empty Fields Tester' });
+
+    const normalNotification = createAssignmentNotification({
+      userId: user.userId,
+      bugTitle: 'Normal bug',
+      message: 'Normal notification message',
+      isRead: false,
+    });
+    const emptyMessageNotif = createNotification({
+      userId: user.userId,
+      type: 'comment',
+      bugTitle: 'Bug with empty message',
+      message: '',
+      isRead: false,
+    });
+    const emptyTitleNotif = createNotification({
+      userId: user.userId,
+      type: 'status_change',
+      bugTitle: '',
+      message: 'Status changed on unnamed bug',
+      isRead: false,
+    });
+    const emptyActorNotif = createNotification({
+      userId: user.userId,
+      type: 'priority_change',
+      bugTitle: 'Priority bug',
+      message: 'Priority changed',
+      actorName: '',
+      actorId: '',
+      isRead: false,
+    });
+
+    await setupNotificationsPage(page, {
+      user,
+      notifications: [normalNotification, emptyMessageNotif, emptyTitleNotif, emptyActorNotif],
+      notificationCount: 4,
+    });
+
+    // When: User navigates to the notifications page
+    await page.goto('/notifications');
+
+    // Then: All 4 notification items render without the page crashing
+    await expect(page.locator('[data-testid="notification-item"]')).toHaveCount(4);
+
+    // And: The normal notification renders fully
+    await expect(page.getByText('Normal notification message')).toBeVisible();
+  });
+});
