@@ -4,3 +4,12 @@ export { createProject } from './project-factory';
 export { createSprint, createPlannedSprint, createCompletedSprint } from './sprint-factory';
 export { createComment } from './comment-factory';
 export { createActivity, createAssignedActivity, createStatusChangedActivity } from './activity-factory';
+export {
+  createNotification,
+  createReadNotification,
+  createAssignmentNotification,
+  createStatusChangeNotification,
+  createCommentNotification,
+  createPriorityChangeNotification,
+  createSeverityEscalationNotification,
+} from './notification-factory';
