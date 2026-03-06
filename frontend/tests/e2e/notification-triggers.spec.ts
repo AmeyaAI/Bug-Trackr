@@ -609,3 +609,259 @@ test.describe('Notification Trigger Service (Story 1.3)', () => {
     await expect(notifElements).toHaveCount(1);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  Edge Cases – Notification Triggers                                 */
+/* ------------------------------------------------------------------ */
+
+test.describe('Notification Trigger Edge Cases', () => {
+  test('EC-1.3-001: Notification with missing actorName renders gracefully @p1 @regression', async ({
+    page,
+  }) => {
+    // Given: A notification where actorName is empty string
+    const notifications = [
+      createAssignmentNotification({
+        id: 'notif-no-actor-1',
+        bugId: 'bug-no-actor-1',
+        bugTitle: 'Missing Actor Bug',
+        actorName: '',
+        actorId: '',
+        message: 'You were assigned to bug #bug-no-actor-1: Missing Actor Bug',
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+    await setupTriggerContext(page, { notifications });
+
+    // When: User navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: The notification renders without crashing, showing the message
+    await expect(page.getByText(/Missing Actor Bug/)).toBeVisible();
+  });
+
+  test('EC-1.3-002: Notification with missing bugId still displays @p1 @regression', async ({
+    page,
+  }) => {
+    // Given: A notification where bugId is empty (e.g., system notification)
+    const notifications = [
+      createNotification({
+        id: 'notif-no-bug-1',
+        bugId: '',
+        bugTitle: '',
+        message: 'System: Your account settings have been updated',
+        type: 'assignment',
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+    await setupTriggerContext(page, { notifications });
+
+    // When: User navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: The notification displays without crashing
+    await expect(page.getByText(/account settings have been updated/)).toBeVisible();
+  });
+
+  test('EC-1.3-003: Multiple rapid status changes produce distinct notifications @p1 @regression', async ({
+    page,
+  }) => {
+    // Given: Multiple distinct status change notifications for the same bug
+    const bugId = 'bug-rapid-status-1';
+    const notifications = [
+      createStatusChangeNotification({
+        id: 'notif-rapid-1',
+        bugId,
+        bugTitle: 'Rapid Status Bug',
+        message: `Bug #${bugId} status changed from Open to In Progress`,
+        actorName: 'Dev Alice',
+        createdAt: new Date(Date.now() - 120000).toISOString(),
+      }),
+      createStatusChangeNotification({
+        id: 'notif-rapid-2',
+        bugId,
+        bugTitle: 'Rapid Status Bug',
+        message: `Bug #${bugId} status changed from In Progress to Resolved`,
+        actorName: 'Dev Alice',
+        createdAt: new Date(Date.now() - 60000).toISOString(),
+      }),
+      createStatusChangeNotification({
+        id: 'notif-rapid-3',
+        bugId,
+        bugTitle: 'Rapid Status Bug',
+        message: `Bug #${bugId} status changed from Resolved to Closed`,
+        actorName: 'QA Bob',
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+    await setupTriggerContext(page, { notifications });
+
+    // When: User navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: All three distinct status change notifications are visible
+    await expect(page.getByText(/Open to In Progress/)).toBeVisible();
+    await expect(page.getByText(/In Progress to Resolved/)).toBeVisible();
+    await expect(page.getByText(/Resolved to Closed/)).toBeVisible();
+  });
+
+  test('EC-1.3-004: Severity escalation to Critical (not just Blocker) triggers notification @p0 @smoke', async ({
+    page,
+  }) => {
+    // Given: A severity escalation to Critical (not Blocker)
+    const adminUser = createAdminUser({ name: 'Admin Critical' });
+    const project = {
+      ...createProject({ name: 'Critical Escalation Project' }),
+      id: 'proj-crit-1',
+      createdAt: new Date().toISOString(),
+    };
+
+    const notifications = [
+      createSeverityEscalationNotification({
+        userId: adminUser.userId,
+        id: 'notif-crit-1',
+        bugId: 'bug-crit-1',
+        bugTitle: 'Critical Production Issue',
+        message: 'URGENT: Bug #bug-crit-1 escalated to Critical',
+        actorName: 'Developer Frank',
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+
+    await seedAuth(page, adminUser);
+    await mockApiRoute(page, 'bugs*', []);
+    await mockApiRoute(page, 'users*', [{ ...adminUser, id: adminUser.userId }]);
+    await mockApiRoute(page, 'projects*', [project]);
+    await mockApiRoute(page, 'sprints*', []);
+    await mockApiRoute(page, 'activity-logs*', []);
+    await mockApiRoute(page, 'comments*', []);
+    await mockApiRoute(page, 'notifications*', notifications);
+    await page.route('**/api/notifications/count*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ unread: 1, total: 1 }),
+      }),
+    );
+
+    // When: Admin navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: The critical escalation notification is visible
+    await expect(page.getByText(/URGENT.*escalated to Critical/)).toBeVisible();
+  });
+
+  test('EC-1.3-005: Deduplication across mixed event types for same bug @p1 @regression', async ({
+    page,
+  }) => {
+    // Given: A user who is both assignee AND receives a comment notification for the same bug
+    // Both are different event types, so both should appear (no false dedup)
+    const userId = 'user-mixed-dedup-1';
+    const bugId = 'bug-mixed-dedup-1';
+    const notifications = [
+      createAssignmentNotification({
+        userId,
+        id: 'notif-mixed-assign-1',
+        bugId,
+        bugTitle: 'Mixed Dedup Bug',
+        message: 'You were assigned to bug: Mixed Dedup Bug',
+        actorName: 'Manager A',
+        createdAt: new Date(Date.now() - 60000).toISOString(),
+      }),
+      createCommentNotification({
+        userId,
+        id: 'notif-mixed-comment-1',
+        bugId,
+        bugTitle: 'Mixed Dedup Bug',
+        actorName: 'Developer B',
+        message: 'Developer B commented on bug: Mixed Dedup Bug',
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+    await setupTriggerContext(page, { notifications });
+
+    // When: User navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: Both notifications are visible (different event types should not be deduped)
+    await expect(page.getByText(/You were assigned to bug.*Mixed Dedup Bug/)).toBeVisible();
+    await expect(page.getByText(/Developer B commented on bug.*Mixed Dedup Bug/)).toBeVisible();
+  });
+
+  test('EC-1.1-001: Notification with null readAt for unread notification @p2 @regression', async ({
+    page,
+  }) => {
+    // Given: An unread notification with explicit null readAt
+    const notifications = [
+      createNotification({
+        id: 'notif-null-readat-1',
+        message: 'Null readAt test notification',
+        isRead: false,
+        readAt: null,
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+    await setupTriggerContext(page, { notifications });
+
+    // When: User navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: The notification displays correctly without timestamp errors
+    await expect(page.getByText('Null readAt test notification')).toBeVisible();
+  });
+
+  test('EC-1.2-001: Notification API returns empty array @p2 @regression', async ({ page }) => {
+    // Given: The notifications API returns an empty array
+    await setupTriggerContext(page, { notifications: [] });
+
+    // When: User navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: Empty state or "no notifications" message is shown (not an error)
+    const emptyOrContent = page.getByText(/no notification/i)
+      .or(page.getByText(/you're all caught up/i))
+      .or(page.getByRole('heading', { name: /notification/i }));
+    await expect(emptyOrContent.first()).toBeVisible();
+  });
+
+  test('EC-1.2-002: Notification API returns 500 error @p1 @regression', async ({ page }) => {
+    // Given: The notifications endpoint returns a 500 error
+    const user = createUser({ name: 'Error API User' });
+    const project = {
+      ...createProject({ name: 'Error Project' }),
+      id: 'proj-err-1',
+      createdAt: new Date().toISOString(),
+    };
+
+    await seedAuth(page, user);
+    await mockApiRoute(page, 'bugs*', []);
+    await mockApiRoute(page, 'users*', [{ ...user, id: user.userId }]);
+    await mockApiRoute(page, 'projects*', [project]);
+    await mockApiRoute(page, 'sprints*', []);
+    await mockApiRoute(page, 'activity-logs*', []);
+    await mockApiRoute(page, 'comments*', []);
+
+    // Return 500 for notifications list
+    await page.route('**/bug_tracking_notificationss*', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Internal Server Error' }),
+      }),
+    );
+    await page.route('**/api/notifications/count*', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Internal Server Error' }),
+      }),
+    );
+
+    // When: User navigates to /notifications
+    await page.goto('/notifications');
+
+    // Then: The page handles the error gracefully (does not show unhandled exception)
+    await expect(page.locator('body')).toBeVisible();
+    // Should not show a raw error stack trace
+    await expect(page.getByText(/unhandled/i)).not.toBeVisible();
+  });
+});

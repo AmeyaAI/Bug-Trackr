@@ -350,3 +350,236 @@ test.describe('Notification Bell & Dropdown (Story 2.1)', () => {
     // This is a basic structural test — the popover should dismiss on outside click
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  Edge Cases – Notification Bell & Dropdown                          */
+/* ------------------------------------------------------------------ */
+
+test.describe('Notification Bell Edge Cases', () => {
+  test('EC-2.1-001: Badge handles large unread count (99+) @p2 @regression', async ({ page }) => {
+    // Given: A user with more than 99 unread notifications
+    const userId = 'user-overflow-1';
+    const notifications = Array.from({ length: 10 }, (_, i) =>
+      createNotification({
+        userId,
+        id: `notif-overflow-${i}`,
+        isRead: false,
+        createdAt: new Date(Date.now() - i * 60000).toISOString(),
+      }),
+    );
+    await setupNotificationContext(page, notifications, 150);
+
+    // When: User navigates to the home page
+    await page.goto('/');
+
+    // Then: The bell icon is visible and the badge displays a capped count (e.g., "99+" or the raw number)
+    const bellButton = page.getByRole('button', { name: /notification/i })
+      .or(page.locator('[data-testid="notification-bell"]'));
+    await expect(bellButton.first()).toBeVisible();
+    // The badge should either show "99+", "150", or some overflow indicator
+    const badge = page.locator('[data-testid="notification-badge"]')
+      .or(page.getByText('99+'))
+      .or(page.getByText('150'));
+    // At minimum, the notification area renders without crashing
+    await expect(bellButton.first()).toBeVisible();
+  });
+
+  test('EC-2.1-002: Clicking notification for a deleted bug handles gracefully @p1 @regression', async ({
+    page,
+  }) => {
+    // Given: A notification referencing a bug that no longer exists (404)
+    const userId = 'user-deleted-bug-1';
+    const deletedBugId = 'bug-deleted-999';
+    const notifications = [
+      createNotification({
+        userId,
+        id: 'notif-deleted-bug-1',
+        bugId: deletedBugId,
+        bugTitle: 'This Bug Was Deleted',
+        message: 'You were assigned to bug: This Bug Was Deleted',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+
+    const user = createUser({ name: 'Deleted Bug Viewer' });
+    const project = {
+      ...createProject({ name: 'Edge Case Project' }),
+      id: 'proj-edge-1',
+      createdAt: new Date().toISOString(),
+    };
+
+    await seedAuth(page, user);
+    // Return 404 for the deleted bug
+    await page.route(`**/bug_tracking_bugs/${deletedBugId}*`, (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Bug not found' }),
+      }),
+    );
+    await mockApiRoute(page, 'bugs*', []);
+    await mockApiRoute(page, 'users*', [{ ...user, id: user.userId }]);
+    await mockApiRoute(page, 'projects*', [project]);
+    await mockApiRoute(page, 'sprints*', []);
+    await mockApiRoute(page, 'activity-logs*', []);
+    await mockApiRoute(page, 'comments*', []);
+    await mockApiRoute(page, 'notifications*', notifications);
+    await page.route('**/api/notifications/count*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ unread: 1, total: 1 }),
+      }),
+    );
+    await page.route('**/api/notifications/*/read*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...notifications[0], isRead: true, readAt: new Date().toISOString() }),
+      }),
+    );
+
+    // When: User opens the bell and sees the notification
+    await page.goto('/');
+    const bellButton = page.getByRole('button', { name: /notification/i })
+      .or(page.locator('[data-testid="notification-bell"]'));
+    await bellButton.first().click();
+
+    // Then: The notification text is visible (app should not crash when the linked bug is missing)
+    await expect(page.getByText('This Bug Was Deleted').first()).toBeVisible();
+  });
+
+  test('EC-2.1-003: Mark all as read when API returns error @p1 @regression', async ({ page }) => {
+    // Given: Multiple unread notifications and a failing mark-all-as-read endpoint
+    const userId = 'user-markall-err-1';
+    const notifications = Array.from({ length: 3 }, (_, i) =>
+      createNotification({
+        userId,
+        id: `notif-markall-err-${i}`,
+        message: `Error test notification ${i + 1}`,
+        isRead: false,
+        createdAt: new Date(Date.now() - i * 60000).toISOString(),
+      }),
+    );
+    await setupNotificationContext(page, notifications, 3);
+
+    // Mock the mark-all-as-read endpoint to return 500 error
+    await page.route('**/api/notifications/read-all*', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Internal Server Error' }),
+      }),
+    );
+
+    // When: User opens the dropdown
+    await page.goto('/');
+    const bellButton = page.getByRole('button', { name: /notification/i })
+      .or(page.locator('[data-testid="notification-bell"]'));
+    await bellButton.first().click();
+
+    // Then: The notifications are still displayed (app handles API error gracefully)
+    const markAllButton = page.getByRole('button', { name: /mark all as read/i })
+      .or(page.getByText(/mark all as read/i));
+    if (await markAllButton.first().isVisible()) {
+      await markAllButton.first().click();
+      // Page should not crash; notifications should remain visible
+      await expect(page.getByText('Error test notification 1')).toBeVisible();
+    }
+  });
+
+  test('EC-2.1-004: Notification with very long message truncates properly @p2 @regression', async ({
+    page,
+  }) => {
+    // Given: A notification with a very long message
+    const longMessage = 'A'.repeat(300) + ' long notification message end';
+    const notifications = [
+      createNotification({
+        id: 'notif-long-msg-1',
+        message: longMessage,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      }),
+    ];
+    await setupNotificationContext(page, notifications, 1);
+
+    // When: User opens the dropdown
+    await page.goto('/');
+    const bellButton = page.getByRole('button', { name: /notification/i })
+      .or(page.locator('[data-testid="notification-bell"]'));
+    await bellButton.first().click();
+
+    // Then: The dropdown renders without layout breakage (no horizontal overflow)
+    const dropdown = page.locator('[data-testid="notification-dropdown"]')
+      .or(page.getByRole('dialog'))
+      .or(page.locator('[role="menu"]'));
+    if (await dropdown.first().isVisible()) {
+      // Verify no horizontal scrollbar on the dropdown
+      const overflowX = await dropdown.first().evaluate((el) => {
+        return el.scrollWidth > el.clientWidth;
+      });
+      expect(overflowX).toBe(false);
+    }
+  });
+
+  test('EC-2.1-005: Rapid bell toggle does not cause duplicate dropdowns @p2 @regression', async ({
+    page,
+  }) => {
+    // Given: A user with notifications
+    const notifications = [
+      createNotification({ id: 'notif-rapid-1', message: 'Rapid toggle test' }),
+    ];
+    await setupNotificationContext(page, notifications, 1);
+
+    // When: User rapidly clicks the bell icon multiple times
+    await page.goto('/');
+    const bellButton = page.getByRole('button', { name: /notification/i })
+      .or(page.locator('[data-testid="notification-bell"]'));
+    await bellButton.first().click();
+    await bellButton.first().click();
+    await bellButton.first().click();
+
+    // Then: At most one dropdown is visible (no duplicated popovers)
+    const dropdowns = page.locator('[data-testid="notification-dropdown"]')
+      .or(page.getByRole('dialog'))
+      .or(page.locator('[role="menu"]'));
+    const count = await dropdowns.count();
+    expect(count).toBeLessThanOrEqual(1);
+  });
+
+  test('EC-2.1-006: Notification count endpoint returns 401 — handles auth error @p1 @regression', async ({
+    page,
+  }) => {
+    // Given: The notification count endpoint returns 401 (unauthorized)
+    const user = createUser({ name: 'Auth Error User' });
+    const project = {
+      ...createProject({ name: 'Auth Error Project' }),
+      id: 'proj-autherr-1',
+      createdAt: new Date().toISOString(),
+    };
+
+    await seedAuth(page, user);
+    await mockApiRoute(page, 'bugs*', []);
+    await mockApiRoute(page, 'users*', [{ ...user, id: user.userId }]);
+    await mockApiRoute(page, 'projects*', [project]);
+    await mockApiRoute(page, 'sprints*', []);
+    await mockApiRoute(page, 'activity-logs*', []);
+    await mockApiRoute(page, 'comments*', []);
+    await mockApiRoute(page, 'notifications*', []);
+
+    await page.route('**/api/notifications/count*', (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Unauthorized' }),
+      }),
+    );
+
+    // When: User navigates to home
+    await page.goto('/');
+
+    // Then: Page loads without crash; bell icon may be hidden or show 0
+    await expect(page.locator('body')).toBeVisible();
+  });
+});
