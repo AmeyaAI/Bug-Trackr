@@ -10,6 +10,7 @@ const COLLECTION_MAP: Record<string, string> = {
   'users': 'users',
   'comments': 'bug_tracking_commentss',
   'activity-logs': 'bug_tracking_activitiess',
+  'notifications': 'bug_tracking_notificationss',
 };
 
 /**
@@ -22,6 +23,7 @@ const SINGULAR_COLLECTION_MAP: Record<string, string> = {
   'users': 'user',
   'comments': 'bug_tracking_comments',
   'activity-logs': 'bug_tracking_activities',
+  'notifications': 'bug_tracking_notifications',
 };
 
 /** External domains that should be blocked in tests */
